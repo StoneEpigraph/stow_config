@@ -1,0 +1,7 @@
+#+title: readme
+* plugins
+** counsel-rg
+   需要安装ripgrep
+   #+begin_src shell
+     sudo apt install ripgrep
+   #+end_src

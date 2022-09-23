@@ -1,2 +1,0 @@
-;;; Generated package description from mood-one-theme.el  -*- no-byte-compile: t -*-
-(define-package "mood-one-theme" "20220613.114" "A dark color scheme inspired by the Doom One theme." '((emacs "24.4")) :commit "033910aaf1bb41f384d1b5b96d55975d1378a34b" :authors '(("Jessie Hildebrandt <jessieh.net>")) :maintainer '("Jessie Hildebrandt <jessieh.net>") :keywords '("mode-line" "faces") :url "https://gitlab.com/jessieh/mood-one-theme")

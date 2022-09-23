@@ -55,8 +55,8 @@
 	  (require 'org-roam-protocol))
 	;; org-roam-ui
 (setq org-roam-v2-ack t)
-(use-package org-roam-ui-mode)
-	(setq org-roam-directory "/home/stone/resource/dailyNotes/")
+(use-package org-roam-ui)
+(setq org-roam-directory "/home/stone/resource/dailyNotes/")
 ;;	(add-to-list 'load-path "~/.emacs.d/private/org-roam-ui")
 ;;	(load-library "org-roam-ui")
 	;; start or-roam-ui on start emacs

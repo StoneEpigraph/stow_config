@@ -1,14 +1,0 @@
-;; Emacs-W3 HTTP cookies file
-;; Automatically generated file!!! DO NOT EDIT!!!
-
-(setq url-cookie-storage
- '(("zhihu.com"
-  [url-cookie "_xsrf" "qsibHLSTsSInsxgkgwwTCr8lbmTtfa3O" "Mon, 02-Sep-24 04:52:24 GMT" "/" "zhihu.com" nil]))
-)
-(setq url-cookie-secure-storage
- 'nil)
-
-;; Local Variables:
-;; version-control: never
-;; no-byte-compile: t
-;; End:

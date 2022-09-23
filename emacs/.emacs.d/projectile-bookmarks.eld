@@ -1,1 +1,0 @@
-("~/dotfile/emacs/.emacs.d/" "~/.emacs.d/" "~/resource/dailyNotes/" "~/" "~/workspace/star/bjvm/rptserver/" "~/resource/dailyNotes/hugo/stoneepigraph.github.io/" "~/workspace/rust/learn_demo/hello_rust1/" "~/workspace/frontend/vue/vueui/vueui-demo2/" "~/workspace/frontend/webpack/1.init/")

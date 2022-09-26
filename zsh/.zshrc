@@ -103,5 +103,6 @@ source $ZSH/oh-my-zsh.sh
 alias vi="vim"
 alias e="emacs -nw"
 alias c="clear"
+alias gu="gitui"
 
 eval $(thefuck --alias)

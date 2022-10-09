@@ -1,0 +1,13 @@
+(
+    focus_right: Some(( code: Char('f'), modifiers: KeyModifiers::CONTROL,)),
+    focus_left: Some(( code: Char('b'), modifiers: KeyModifiers::CONTROL,)),
+    focus_above: Some(( code: Char('p'), modifiers: KeyModifiers::CONTROL,)),
+    focus_below: Some(( code: Char('n'), modifiers: KeyModifiers::CONTROL,)),
+    
+    move_left: Some(( code: Char('f'), modifiers: KeyModifiers::CONTROL,)),
+    move_right: Some(( code: Char('b'), modifiers: KeyModifiers::CONTROL,)),
+    move_up: Some(( code: Char('p'), modifiers: Keymodifiers::CONTROL,)),
+    move_down: Some(( code: Char('n'), modifiers: KeyModifiers::CONTROL,)),
+
+    open_help: Some(( code: F(1), modifiers: ( bits: 0,),)),
+)

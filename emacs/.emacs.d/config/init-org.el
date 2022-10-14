@@ -13,7 +13,7 @@
 	;; 如果需要同时添加@和!需要在两个特殊字符之前添加/
 	(setq org-todo-keywords
 	      '((sequence "TODO(t)" "BUG(b)" "WAITING(w@/!)" "|" "FIXED(f)")
-		(sequence "MAYBE(m)" "|" "DONE(d!)" "CONTACT(l)" "CANCELED(c@/!)")))
+		(sequence "MAYBE(m)" "CONTACT(l)" "|" "DONE(d!)" "CANCELED(c@/!)")))
 	(custom-set-variables
 	  '(org-agenda-files (quote ("~/resource/dailyNotes/todo.org")))
 	)

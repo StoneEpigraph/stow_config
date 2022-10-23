@@ -26,10 +26,19 @@ unless give a prefix argument."
     (replace-match " "))
   )
 
-;; no backup file
+;; no backup file 
 (setq make-backup-files nil)
 ;; 在输入内容后删除选中的内容
 (delete-selection-mode t)
+
+;; 在其它编辑器编辑文件后Emacs会自动更新
+(global-auto-revert-mode 1)
+;; 关闭自动产生的保存文件
+(setq auto-save-default nil)
+;; 关闭错误提示音
+;; (setq ring-bell-function 'ignore)
+;; 将yes替换成y
+(fset 'gnus-yes-or-no-p 'y-or-n-p)
 
 (provide 'init-custom)
 

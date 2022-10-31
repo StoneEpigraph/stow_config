@@ -1,10 +1,11 @@
-;;;; Emacs Bookmark Format Version 1 ;;;; -*- coding: utf-8-emacs -*-
+;;;; Emacs Bookmark Format Version 1;;;; -*- coding: utf-8-emacs; mode: lisp-data -*-
 ;;; This format is meant to be slightly human-readable;
 ;;; nevertheless, you probably don't want to edit it.
 ;;; -*- End Of Bookmark File Format Version Stamp -*-
 (("org-capture-last-stored"
- (filename . "~/resource/dailyNotes/daily/2022-02-25.org")
- (front-context-string . ":PROPERTIES:\n:ID")
- (rear-context-string)
- (position . 1))
+ (filename . "~/resource/dailyNotes/todolist.org")
+ (front-context-string . "** TODO [#B] 同步包")
+ (rear-context-string . "|\n#+END:\n* gtd\n\n")
+ (position . 128218)
+ (last-modified 25430 12090 351000 522000))
 )

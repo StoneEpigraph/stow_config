@@ -109,7 +109,7 @@
 ;; org-capture
 (setq org-capture-templates
       '(("t" "TODO" entry (file+headline "~/resource/dailyNotes/todolist.org" "gtd")
-	 "* TODO [#B] %? %i\n %U"
+	 "* TODO [#B] %? %i\n SCHEDULED: %T"
 	 :empty-lines 1)))
 (global-set-key (kbd "C-c r") 'org-capture)
 (provide 'init-org)

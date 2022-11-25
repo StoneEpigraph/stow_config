@@ -8,6 +8,7 @@
 (require 'init-kbd)
 (require 'init-lsp)
 (require 'init-org)
+(require 'init-hugo)
 (require 'init-mode)
 (require 'init-custom)
 (require 'init-eaf)

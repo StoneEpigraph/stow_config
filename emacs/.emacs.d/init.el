@@ -43,7 +43,7 @@
    '("~/resource/dailyNotes/Note/Tools/Emacs/Emacs-note.org" "/home/stone/resource/dailyNotes/dailyRoutine/Star/resources.org" "/home/stone/resource/dailyNotes/todolist.org"))
  '(org-agenda-insert-diary-extract-time nil)
  '(package-selected-packages
-   '(org-checklist rg ox-hugo baidu-translate backup-each-save org-roam-ui elfeed org-tempo wgrep keycast leetcode keyfreq geiser-chez elfeed-web el-secretario-elfeed simple-httpd websocket inf-ruby htmlize org-roam-server org-roam w3m emmet-mode company-web vue-mode org-download yaml-mode typescript-mode youdao-dictionary company-lsp org-bullets org-bullet swiper-helm window-numbering neotree mood-one-theme historian flx counsel-web all-the-icons))
+   '(org-checklist rg ox-hugo baidu-translate backup-each-save org-roam-ui elfeed org-tempo wgrep leetcode keyfreq geiser-chez elfeed-web el-secretario-elfeed simple-httpd websocket inf-ruby htmlize org-roam-server w3m emmet-mode company-web vue-mode org-download yaml-mode typescript-mode youdao-dictionary company-lsp org-bullets org-bullet swiper-helm window-numbering neotree historian flx counsel-web all-the-icons))
  '(treemacs-show-hidden-files t))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.

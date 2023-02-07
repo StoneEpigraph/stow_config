@@ -32,6 +32,7 @@
   :config
   (add-hook 'dired-mode-hook 'org-download-enable)
 )
+
 (setq-default org-download-image-dir "/home/stone/resource/dailyNotes/resources/pic/")
 
 ;; init org-indent-mode
@@ -50,7 +51,7 @@
 	 ;; Dailies
 	 ("C-c n j" . org-roam-dailies-capture-today))
   :config
-  (org-roam-db-autosync-mode)
+  ;;  (org-roam-db-autosync-mode)
   ;; If using org-roam-protocol
   (require 'org-roam-protocol))
 ;; org-roam-ui
@@ -72,12 +73,6 @@
 ;;    (global-set-key (kbd "C-c C-x h") 'org-toggle-item)))
 ;;; image paste
 ;;; (setq-default org-download-image-dir "~/Pictures/foo")
-(use-package org-download
-  :ensure t
-  :config
-  ;; Drag and drop to Dired
-  (add-hook 'dired-mode-hook 'org-download-enable)
-  )
 
 ;; 启动缩进
 (add-hook 'org-mode-hook 'org-indent-mode)

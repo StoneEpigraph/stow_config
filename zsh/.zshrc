@@ -106,3 +106,4 @@ alias c="clear"
 alias gu="gitui"
 
 eval $(thefuck --alias)
+eval "$(zoxide init zsh)"

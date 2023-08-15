@@ -9,3 +9,4 @@ Plug 'tpope/vim-surround'
 Plug 'jistr/vim-nerdtree-tabs'
 Plug 'Xuyuanp/nerdtree-git-plugin'
 call plug#end()
+set cul

@@ -104,6 +104,10 @@ alias vi="vim"
 alias e="emacs -nw"
 alias c="clear"
 alias gu="gitui"
+alias sz="lrzsz-sz"
+alias rz="lrzsz-rz"
+
+
 
 eval $(thefuck --alias)
 eval "$(zoxide init zsh)"

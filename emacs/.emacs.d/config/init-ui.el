@@ -28,10 +28,10 @@
 (global-set-key (kbd "C-0") 'text-scale-adjust)
 
 ;; 全屏
-;; (add-to-list 'default-frame-alist '(fullscreen . maximized))
+(add-to-list 'default-frame-alist '(fullscreen . maximized))
 ;; 指定启动大小
-(add-to-list 'default-frame-alist '(width . 260))
-(add-to-list 'default-frame-alist '(height . 60))
+;; (add-to-list 'default-frame-alist '(width . 260))
+;; (add-to-list 'default-frame-alist '(height . 60))
 ;; (add-to-list 'default-frame-alist '(top . 5))
 ;; (add-to-list 'default-frame-alist '(left . 5))
 (set-frame-parameter (selected-frame) 'alpha '(95 80))

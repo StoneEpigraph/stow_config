@@ -107,4 +107,7 @@
 	 "* TODO [#B] %? %i\n SCHEDULED: %T"
 	 :empty-lines 1)))
 (global-set-key (kbd "C-c r") 'org-capture)
+;; org-superstart-mode
+;;(require 'org-superstar)
+;; (add-hook 'org-mode-hook (lambda () (org-superstar-mode 1)))
 (provide 'init-org)

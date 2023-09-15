@@ -1,0 +1,6 @@
+# State when last error occurred on 2023-09-15 13:16:48
+# Error was (args-out-of-range #s(treemacs-workspace Default (#s(treemacs-project dailyNotes /home/stone/resource/dailyNotes local-readable nil))) 3)
+
+* Default
+** dailyNotes
+ - path :: ~/resource/dailyNotes

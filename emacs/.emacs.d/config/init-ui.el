@@ -2,7 +2,7 @@
 ;;; Code:
 (tool-bar-mode -1)
 (scroll-bar-mode -1)
-(menu-bar-mode -1)
+;; (menu-bar-mode -1)
 (global-hl-line-mode t)
 (setq inhibit-splash-screen t)
 (setq initial-scratch-message "\
@@ -28,12 +28,12 @@
 (global-set-key (kbd "C-0") 'text-scale-adjust)
 
 ;; 全屏
-(add-to-list 'default-frame-alist '(fullscreen . maximized))
+;; (add-to-list 'default-frame-alist '(fullscreen . maximized))
 ;; 指定启动大小
-;; (add-to-list 'default-frame-alist '(width . 260))
-;; (add-to-list 'default-frame-alist '(height . 60))
-;; (add-to-list 'default-frame-alist '(top . 5))
-;; (add-to-list 'default-frame-alist '(left . 5))
+(add-to-list 'default-frame-alist '(width . 260))
+(add-to-list 'default-frame-alist '(height . 60))
+(add-to-list 'default-frame-alist '(top . 200))
+(add-to-list 'default-frame-alist '(left . 200))
 (set-frame-parameter (selected-frame) 'alpha '(95 80))
 
 

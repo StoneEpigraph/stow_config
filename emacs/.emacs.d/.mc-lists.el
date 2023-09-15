@@ -8,5 +8,6 @@
 
 (setq mc/cmds-to-run-once
       '(
+	suspend-frame
 	yaml-electric-backspace
 	))

@@ -275,6 +275,8 @@ Other buffer group by `awesome-tab-get-group-name' with project name."
   (setq wgrep-auto-save-buffer t))
 ;; elfeed
 (use-package elfeed)
+;; 代码块
+(require 'org-tempo)
 
 (provide 'init-package)
 ;;; init-package.el ends here

@@ -1,3 +1,4 @@
+
 ;;; display setting
 ;;; Code:
 (tool-bar-mode -1)
@@ -30,10 +31,10 @@
 ;; 全屏
 ;; (add-to-list 'default-frame-alist '(fullscreen . maximized))
 ;; 指定启动大小
-(add-to-list 'default-frame-alist '(width . 260))
+(add-to-list 'default-frame-alist '(width . 235))
 (add-to-list 'default-frame-alist '(height . 60))
-(add-to-list 'default-frame-alist '(top . 200))
-(add-to-list 'default-frame-alist '(left . 200))
+(add-to-list 'default-frame-alist '(top . 100))
+(add-to-list 'default-frame-alist '(left . 100))
 (set-frame-parameter (selected-frame) 'alpha '(95 80))
 
 

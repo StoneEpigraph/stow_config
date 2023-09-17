@@ -40,6 +40,9 @@ unless give a prefix argument."
 ;; 将yes替换成y
 (fset 'gnus-yes-or-no-p 'y-or-n-p)
 
+;; 不生产backup文件
+(setq make-backup-files nil)
+
 (provide 'init-custom)
 
 

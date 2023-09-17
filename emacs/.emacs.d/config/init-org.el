@@ -33,7 +33,7 @@
   (add-hook 'dired-mode-hook 'org-download-enable)
 )
 
-(setq-default org-download-image-dir "/home/stone/resource/dailyNotes/resources/pic/")
+(setq-default org-download-image-dir "./img")
 
 ;; init org-indent-mode
 ;; emacs28.1之后无效,使用add-hook方式启动
@@ -107,7 +107,49 @@
 	 "* TODO [#B] %? %i\n SCHEDULED: %T"
 	 :empty-lines 1)))
 (global-set-key (kbd "C-c r") 'org-capture)
+;; config org-capture windows open position
+(add-to-list 'display-buffer-alist
+  '("Org Select"
+    (display-buffer-in-side-window)
+    (window-height . 0.4)
+    (side . bottom))
+  '("CAPTURE-*"
+    (display-buffer-in-side-window)
+    (window-width . 0.3)
+    (side . right))
+  '("Org Agenda"
+    (display-buffer-in-direction)
+    (window-width . 0.3)
+    (direction . right)))
 ;; org-superstart-mode
 ;;(require 'org-superstar)
 ;; (add-hook 'org-mode-hook (lambda () (org-superstar-mode 1)))
+
+;; 生成hugo头
+;; #+HUGO_BASE_DIR: ~/resource/dailyNotes/hugo/stoneepigraph.github.io/
+;; #+HUGO_SECTION: posts/
+;; #+HUGO_CATEGORIES: "book" "read" "soft skills"
+;; #+HUGO_TAGS: "book" "read" "soft skills"
+;; #+DRAFT: false
+;; #+DATE: 2022-11-25
+;; #+title: 代码之外的生存指南
+(defun gen_hugo_title ()
+  "generate hugo title content"
+  (interactive)
+  (progn
+    (goto-char (point-max))
+    (insert "#+HUGO_BASE_DIR: ~/resource/dailyNotes/hugo/stoneepigraph.github.io/\n")
+    (insert "#+HUGO_SECTION: posts/\n")
+    (insert "#+HUGO_CATEGORIES: \n")
+    (insert "#+HUGO_TAGS: \n")
+    (insert "#+DRAFT: false\n")
+    (insert "#+DATE: \n")
+    (insert "#+TITLE: \n")
+    ))
+
+(defun new-org ()
+  "generate new org file."
+  (interactive)
+  (org-id-get-create)
+  (gen_hugo_title))
 (provide 'init-org)

@@ -11,7 +11,7 @@
 (require 'init-hugo)
 (require 'init-mode)
 (require 'init-custom)
-(require 'init-eaf)
+;; (require 'init-eaf)
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
@@ -236,16 +236,17 @@
      "/home/stone/resource/dailyNotes/todolist.org"))
  '(org-agenda-insert-diary-extract-time nil)
  '(package-selected-packages
-   '(pandoc-mode xmind-org org-checklist rg ox-hugo baidu-translate
-		 backup-each-save org-roam-ui elfeed org-tempo wgrep
-		 keycast leetcode keyfreq geiser-chez elfeed-web
-		 el-secretario-elfeed simple-httpd websocket inf-ruby
-		 htmlize org-roam-server org-roam w3m emmet-mode
-		 company-web vue-mode org-download yaml-mode
-		 typescript-mode youdao-dictionary company-lsp
-		 org-bullets org-bullet swiper-helm window-numbering
-		 neotree mood-one-theme historian flx counsel-web
-		 all-the-icons))
+   '(yasnippet-snippets treesit-auto pandoc-mode xmind-org org-checklist
+			rg ox-hugo baidu-translate backup-each-save
+			org-roam-ui elfeed org-tempo wgrep keycast
+			leetcode keyfreq geiser-chez elfeed-web
+			el-secretario-elfeed simple-httpd websocket
+			inf-ruby htmlize org-roam-server org-roam w3m
+			emmet-mode company-web vue-mode org-download
+			yaml-mode typescript-mode youdao-dictionary
+			company-lsp org-bullets org-bullet swiper-helm
+			window-numbering neotree mood-one-theme
+			historian flx counsel-web all-the-icons))
  '(treemacs-show-hidden-files t))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.

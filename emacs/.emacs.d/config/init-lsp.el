@@ -20,11 +20,45 @@
 
 ;; lsp-bridge
 
-(add-to-list 'load-path "/home/stone/.emacs.d/private/lsp-bridge")
-(require 'yasnippet)
-(yas-global-mode)
-(require 'lsp-bridge)
-(global-lsp-bridge-mode)
+;; (add-to-list 'load-path "/home/stone/.emacs.d/private/lsp-bridge")
+;; (require 'yasnippet)
+;; (yas-global-mode)
+;; (require 'lsp-bridge)
+;; (global-lsp-bridge-mode)
+
+(require 'eglot)
+
+(use-package treesit-auto
+  :demand
+  :init
+  (progn
+    (setq treesit-font-lock-level 4)
+    )
+  :config
+  (global-treesit-auto-mode))
+
+(use-package yasnippet
+  :ensure t)
+;; (use-package yasnippet
+;;   :ensure t
+;;   :hook ((prog-mode . yas-mirror-mode)
+;; 	 (org-mode . yas-minor-mode))
+;;   :init
+;;   :config
+;;   (progn
+;;     (setq hippie-expand-try-functions-list
+;; 	  '(yas/hippie-try-expand
+;; 	    try-complete-file-name-partially
+;; 	    try-expand-all-abbrevs
+;; 	    try-expand-dabbrev
+;; 	    try-expand-dabbrev-all-buffers
+;; 	    try-expand-dabbrev-from-kill
+;; 	    try-complete-lisp-symbol-partially
+;; 	    try-complete-lisp-symbol))))
+
+(use-package yasnippet-snippets
+  :ensure t
+  :after yasnippet)
 
 
 (provide 'init-lsp)

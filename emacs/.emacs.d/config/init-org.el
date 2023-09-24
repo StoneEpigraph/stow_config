@@ -12,11 +12,22 @@
 ;; 如果想在改变状态的时候输入说明需要添加@
 ;; 如果需要同时添加@和!需要在两个特殊字符之前添加/
 (setq org-todo-keywords
-      '((sequence "TODO(t)" "BUG(b)" "WAITING(w@/!)" "|" "FIXED(f)")
-	(sequence "MAYBE(m)" "CONTACT(l)" "|" "DONE(d!)" "CANCELED(c@/!)")))
+      '((sequence "TODO(t)" "PROG(p)" "WAITING(w@/!)" "|"  "DONE(d!)")
+	(sequence "MAYBE(m)" "BUG(b)" "|" "FIXED(f)" "CANCELED(c@/!)")))
+
+(setq org-todo-keyword-faces
+      '(("PROG" . (:foreground "yellow" :weight bold))))
+
 (custom-set-variables
-  '(org-agenda-files (quote ("~/resource/dailyNotes/todo.org")))
-)
+  '(org-agenda-files (quote ("~/resource/dailyNotes")))
+  )
+  ;; Customized view for the daily workflow. (Command: ", a n")
+  (setq org-agenda-custom-commands
+        '(("n" "My Weekly Agenda"
+           ((agenda "" nil)
+            (todo "TODO" nil)
+            (todo "DONE" nil))
+           nil)))
 
 (defun org-summary-todo (n-done n-not-done)
      "Switch entry to DONE when all subentries are done, to TODO otherwise."

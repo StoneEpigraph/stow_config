@@ -20,5 +20,7 @@
  (end-of-line)
  )
 
+(setq org-hugo-base-dir "/home/stone/resource/dailyNotes/hugo/stoneepigraph.github.io/")
+
 (provide 'init-hugo)
 ;;; end file

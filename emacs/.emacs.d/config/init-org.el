@@ -25,8 +25,8 @@
   (setq org-agenda-custom-commands
         '(("n" "My Weekly Agenda"
            ((agenda "" nil)
-            (todo "TODO" nil)
-            (todo "DONE" nil))
+	    (todo "PROG" nil)
+            (todo "TODO" nil))
            nil)))
 
 (defun org-summary-todo (n-done n-not-done)

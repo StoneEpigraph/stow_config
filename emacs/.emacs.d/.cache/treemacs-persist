@@ -1,7 +1,3 @@
 * Default
-** dailyNotes
- - path :: ~/resource/dailyNotes
-** workdata
- - path :: ~/workdata
-** workspace
- - path :: ~/workspace
+** stone
+ - path :: ~

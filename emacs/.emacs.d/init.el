@@ -227,7 +227,6 @@
      "http://feeds.feedburner.com/performancing"
      "http://feeds.feedburner.com/JohnChowDotCom"
      "http://www.micropersuasion.com/rss.xml"
-     "http://www.problogger.net/feed/"
      "http://feeds.feedburner.com/QuickOnlineTips"
      "http://www.successful-blog.com/feed/"))
  '(org-agenda-files

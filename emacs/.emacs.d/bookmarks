@@ -4,8 +4,7 @@
 ;;; -*- End Of Bookmark File Format Version Stamp -*-
 (("org-capture-last-stored"
  (filename . "~/resource/dailyNotes/todolist.org")
- (front-context-string . "** TODO [#B] 同步包")
- (rear-context-string . "|\n#+END:\n* gtd\n\n")
- (position . 128218)
- (last-modified 25430 12090 351000 522000))
+ (front-context-string . "** TODO [#B] 这是一")
+ (rear-context-string . "55\n:END:\n* gtd\n\n") (position . 185970)
+ (last-modified 25903 31460 137025 915000))
 )

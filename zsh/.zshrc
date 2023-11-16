@@ -106,6 +106,8 @@ alias c="clear"
 alias gu="gitui"
 alias sz="lrzsz-sz"
 alias rz="lrzsz-rz"
+alias y="yazi"
+alias gdis="git diff --ignore-space-change --ignore-all-space"
 
 
 

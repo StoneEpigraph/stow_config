@@ -219,7 +219,6 @@
      "http://feeds.ogleearth.com/ogleearth"
      "http://www.panoramio.com/blog/feed/"
      "http://feeds.feedburner.com/psblog"
-     "http://blog.wired.com/games/rss.xml"
      "http://www.bloggingpro.com/feed/"
      "http://feeds.copyblogger.com/Copyblogger"
      "http://feeds.feedburner.com/DailyBlogTips"

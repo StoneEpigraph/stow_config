@@ -1,0 +1,4 @@
+[v1]
+"cargo-generate 0.21.2 (registry+https://github.com/rust-lang/crates.io-index)" = ["cargo-generate"]
+"create-tauri-app 4.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = ["cargo-create-tauri-app"]
+"wasm-pack 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)" = ["wasm-pack"]

@@ -4,6 +4,7 @@
 (add-hook 'org-mode-hook 'org-bullets-mode)
 ;; org-agenda
 ;; (setq org-agenda-fies '("~/resource/nutStore/我的坚果云/todo.org"))
+(setq org-agenda-files '("~/resource/dailyNotes/todolist.org" "~/resource/dailyNotes/daily/"))
 ;; orgmode truncate lines
 (add-hook 'org-mode-hook
   (lambda () (setq truncate-lines nil)))
@@ -61,10 +62,14 @@
 	 ("C-c n c" . org-roam-capture)
 	 ;; Dailies
 	 ("C-c n j" . org-roam-dailies-capture-today))
+  :bind-keymap
+  ("C-c n d" . org-roam-dailies-map)
   :config
   ;;  (org-roam-db-autosync-mode)
   ;; If using org-roam-protocol
-  (require 'org-roam-protocol))
+  (require 'org-roam-protocol)
+  (require 'org-roam-dailies)
+  (org-roam-db-autosync-mode))
 ;; org-roam-ui
 (setq org-roam-v2-ack t)
 (use-package org-roam-ui)
@@ -114,7 +119,7 @@
 
 ;; org-capture
 (setq org-capture-templates
-      '(("t" "TODO" entry (file+headline "~/resource/dailyNotes/todolist.org" "gtd")
+      '(("t" "TODO" entry (file+headline "~/resource/dailyNotes/ntodolist.org" "gtd")
 	 "* TODO [#B] %? %i\n SCHEDULED: %T"
 	 :empty-lines 1)))
 (global-set-key (kbd "C-c r") 'org-capture)

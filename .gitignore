@@ -3,6 +3,11 @@ emacs/.emacs.d/org-roam.db
 emacs/.emacs.d/elpa
 emacs/.emacs.d/url
 emacs/.emacs.d/.org-id-locations
+cargo/.cargo/bin
+cargo/.cargo/registry
+cargo/.cargo/.global-cache
+cargo/.cargo/.package-cache
+cargo/.cargo/.package-cache-mutate
 *.eld
 .*~
 \#*#

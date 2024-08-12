@@ -3,7 +3,7 @@
 ;;; Code:
 (tool-bar-mode -1)
 (scroll-bar-mode -1)
-;; (menu-bar-mode -1)
+(menu-bar-mode -1)
 (global-hl-line-mode t)
 (setq inhibit-splash-screen t)
 (setq initial-scratch-message "\

@@ -43,7 +43,18 @@
    '("~/resource/dailyNotes/Note/Tools/Emacs/Emacs-note.org" "/home/stone/resource/dailyNotes/dailyRoutine/Star/resources.org" "/home/stone/resource/dailyNotes/todolist.org"))
  '(org-agenda-insert-diary-extract-time nil)
  '(package-selected-packages
-   '(ripgrep backup-each-save baidu-translate company eaf-markmap elfeed emacsql-sqlite embark-consult epc flycheck fzf indent-guide keycast keyfreq lsp-python-ms lsp-treemacs lsp-ui marginalia mood-one-theme multiple-cursors orderless org-bullets org-download org-roam-ui ox-hugo pandoc-mode rainbow-delimiters rust-mode smartparens swiper treemacs-icons-dired treemacs-magit treemacs-persp treemacs-projectile treesit-auto vertico web-mode wgrep which-key window-numbering yasnippet-snippets youdao-dictionary))
+   '(backup-each-save baidu-translate company eaf-markmap elfeed
+		      embark-consult epc flycheck fzf indent-guide
+		      keycast keyfreq lsp-python-ms lsp-treemacs
+		      lsp-ui marginalia mood-one-theme
+		      multiple-cursors orderless org-bullets
+		      org-download org-roam-ui ox-hugo pandoc-mode
+		      rainbow-delimiters rg rust-mode smartparens
+		      swiper treemacs-icons-dired treemacs-magit
+		      treemacs-persp treemacs-projectile treesit-auto
+		      vertico web-mode wgrep which-key
+		      window-numbering yasnippet-snippets
+		      youdao-dictionary))
  '(treemacs-show-hidden-files t))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.

@@ -10,10 +10,10 @@
 ; (use-package counsel)
 
 ;; package magit
-(use-package magit
-  :config
-  (progn
-    (global-set-key (kbd "C-x g") 'magit-status)))
+;;(use-package magit			;
+;;  :config
+;;  (progn
+;;    (global-set-key (kbd "C-x g") 'magit-status)))
 ;; package counsel-web
 ;; (global-set-key (kbd "M-x") 'counsel-M-x)
 
@@ -118,9 +118,9 @@
   :ensure t
   :config (treemacs-icons-dired-mode))
 
-(use-package treemacs-magit
-  :after treemacs magit
-  :ensure t)
+;;(use-package treemacs-magit
+;;  :after treemacs magit
+;;  :ensure t)
 
 (use-package treemacs-persp ;;treemacs-persective if you use perspective.el vs. persp-mode
   :after treemacs persp-mode ;;or perspective vs. persp-mode
@@ -249,14 +249,15 @@ Other buffer group by `awesome-tab-get-group-name' with project name."
   (list
    (cond
     ((or (string-equal "*" (substring (buffer-name) 0 1))
-         (memq major-mode '(magit-process-mode
-                            magit-status-mode
-                            magit-diff-mode
-                            magit-log-mode
-                            magit-file-mode
-                            magit-blob-mode
-                            magit-blame-mode
-                            )))
+;;         (memq major-mode '(magit-process-mode
+;;                            magit-status-mode
+;;                            magit-diff-mode
+;;                            magit-log-mode
+;;                            magit-file-mode
+;;                            magit-blob-mode
+;;                            magit-blame-mode
+;;                            ))
+	 )
      "Emacs")
     ((derived-mode-p 'eshell-mode)
      "EShell")

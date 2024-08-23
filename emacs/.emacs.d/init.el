@@ -50,7 +50,7 @@
 		      multiple-cursors orderless org-bullets
 		      org-download org-roam-ui ox-hugo pandoc-mode
 		      rainbow-delimiters rg rust-mode smartparens
-		      swiper treemacs-icons-dired treemacs-magit
+		      swiper treemacs-icons-dired
 		      treemacs-persp treemacs-projectile treesit-auto
 		      vertico web-mode wgrep which-key
 		      window-numbering yasnippet-snippets

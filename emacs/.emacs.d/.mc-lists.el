@@ -4,10 +4,12 @@
 (setq mc/cmds-to-run-for-all
       '(
 	keyboard-escape-quit
+	mouse-drag-tab-line
 	))
 
 (setq mc/cmds-to-run-once
       '(
 	suspend-frame
+	xref-go-forward
 	yaml-electric-backspace
 	))

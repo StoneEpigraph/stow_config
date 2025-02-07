@@ -10,4 +10,5 @@
 (setq web-mode-code-indent-offset 2)
 (setq server-mode t)
 (global-reveal-mode t)
+(use-package rust-mode)
 (provide 'init-mode)

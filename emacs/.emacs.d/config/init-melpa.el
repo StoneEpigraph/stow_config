@@ -8,8 +8,12 @@
 ;;			("melpa" . "http://elpa.emacs-china.org/melpa/")
 ;;			("melpa-stable" . "http://elpa.emacs-china.org/melpa-stable/")
 ;;			("org" . "http://elpa.emacs-china.org/org/")))
+(add-to-list 'package-archives
+             '("melpa" . "https://melpa.org/packages/") t)
+
 (setq package-load-list '(all))
 (package-initialize) ;; You might already have this line
+(package-refresh-contents)
 (setq package-enable-at-startup nil)
 (unless (package-installed-p 'use-package)
   (package-refresh-contents)

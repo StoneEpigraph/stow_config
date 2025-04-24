@@ -11,6 +11,9 @@
 (require 'init-hugo)
 (require 'init-mode)
 (require 'init-custom)
+;; set auto generate code into custom.el
+(setq custom-file (expand-file-name "custom.el" user-emacs-directory))
+(load custom-file)
 ;; (require 'init-eaf)
 (custom-set-variables
  ;; custom-set-variables was added by Custom.

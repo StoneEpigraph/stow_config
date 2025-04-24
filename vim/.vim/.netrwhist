@@ -1,4 +1,7 @@
 let g:netrw_dirhistmax  =10
-let g:netrw_dirhistcnt =2
+let g:netrw_dirhistcnt =5
+let g:netrw_dirhist_5='/tmp/create_ap.wlan0.conf.3qsVD9Ks/hostapd_ctrl'
+let g:netrw_dirhist_4='/usr/share/applications'
+let g:netrw_dirhist_3='/etc/nginx'
 let g:netrw_dirhist_2='/home/stone/workspace/rust/demo/rtd'
 let g:netrw_dirhist_1='/home/stone/autoload'

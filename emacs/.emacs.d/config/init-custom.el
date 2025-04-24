@@ -32,16 +32,23 @@ unless give a prefix argument."
 (delete-selection-mode t)
 
 ;; 在其它编辑器编辑文件后Emacs会自动更新
-(global-auto-revert-mode 1)
+(global-auto-revert-mode t)
 ;; 关闭自动产生的保存文件
 (setq auto-save-default nil)
 ;; 关闭错误提示音
 ;; (setq ring-bell-function 'ignore)
 ;; 将yes替换成y
-(fset 'gnus-yes-or-no-p 'y-or-n-p)
+;; (fset 'gnus-yes-or-no-p 'y-or-n-p)
+(setq-default use-short-answers t)
 
 ;; 不生产backup文件
 (setq make-backup-files nil)
+(setq backup-inhibited t)
+
+(setq backup-directory-alist '(("." . "~/.saves")))
+
+;; 删除文件时使用系统的回收站
+(setq-default delete-by-moving-to-trash)
 
 (provide 'init-custom)
 

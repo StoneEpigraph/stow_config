@@ -279,6 +279,9 @@ Other buffer group by `awesome-tab-get-group-name' with project name."
 ;; 代码块
 (require 'org-tempo)
 
+;; rust mode
+(require 'rust-mode)
+
 (provide 'init-package)
 ;;; init-package.el ends here
 

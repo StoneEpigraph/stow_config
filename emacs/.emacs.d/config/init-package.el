@@ -281,7 +281,10 @@ Other buffer group by `awesome-tab-get-group-name' with project name."
 
 ;; rust mode
 (require 'rust-mode)
+;; markdown preview
+(defun markdown-live-preview-window-w3m (file)  "Preview FILE with w3m.To be used with `markdown-live-preview-window-function'."  (if (require 'w3m nil t)      (progn        (w3m (concat "file://" file))        (get-buffer "*w3m*"))    (error "w3m is not present or not loaded on this version of Emacs")))(setq markdown-live-preview-window-function 'markdown-live-preview-window-w3m)
 
 (provide 'init-package)
 ;;; init-package.el ends here
+
 

@@ -1,4 +1,4 @@
-;;; package --- Commentary
+;;; package --- Commentary  -*- lexical-binding: t; -*-
 ;;; Commentary:
 ;;; Code:
 ;; org config

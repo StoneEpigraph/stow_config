@@ -1,4 +1,4 @@
-;;; hugo config
+;;; hugo config  -*- lexical-binding: t; -*-
 
 (use-package ox-hugo
   :ensure t

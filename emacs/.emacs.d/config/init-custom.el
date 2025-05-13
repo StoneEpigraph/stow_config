@@ -1,11 +1,11 @@
-;; init-custom
+;; init-custom.el   -*- coding:utf-8; lexical-binding:nil -*-
 ;;; code
 ;; put current line to top of window
+;;; Code:
 (defun line-to-top ()
   "move current line to top of window."
   (interactive)
   (recenter 0))
-
 (global-set-key "\C-xt" 'line-to-top)
 
 ;; switch-to-buffer advice

@@ -1,4 +1,4 @@
-;;; Package --- summary
+;;; Package --- summary  -*- lexical-binding: t; -*-
 ;;; Commentary;
 ;; set open file mode
 ;;; code:

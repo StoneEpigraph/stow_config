@@ -1,15 +1,18 @@
+;; -*- lexical-binding: t; -*-
 
 ;; setting source
 (require 'package)
- (setq package-archives '(("gnu"   . "http://mirrors.tuna.tsinghua.edu.cn/elpa/gnu/")
-                          ("melpa" . "http://mirrors.tuna.tsinghua.edu.cn/elpa/melpa/")
- 			 ("org"   . "http://mirrors.tuna.tsinghua.edu.cn/elpa/org/")))
+(setq package-archives '(
+			 ;; ("gnu"   . "http://mirrors.tuna.tsinghua.edu.cn/elpa/gnu/")
+                          ("melpa" . "https://melpa.org/packages/")
+ 			  ;; ("org"   . "http://mirrors.tuna.tsinghua.edu.cn/elpa/)
+			  ))
 ;;(setq package-archives '(("gnu" . "http://elpa.emacs-china.org/gnu/")
 ;;			("melpa" . "http://elpa.emacs-china.org/melpa/")
 ;;			("melpa-stable" . "http://elpa.emacs-china.org/melpa-stable/")
 ;;			("org" . "http://elpa.emacs-china.org/org/")))
-(add-to-list 'package-archives
-             '("melpa" . "https://melpa.org/packages/") t)
+;; (add-to-list 'package-archives
+;;              '("melpa" . "https://melpa.org/packages/") t)
 
 (setq package-load-list '(all))
 (package-initialize) ;; You might already have this line

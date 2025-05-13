@@ -1,4 +1,4 @@
-;;; package: --- Summary
+;;; package: --- Summary  -*- lexical-binding: t; -*-
 ;;; commentary:
 ;;; init-package.el this is my installed package config
 ;;; Code:

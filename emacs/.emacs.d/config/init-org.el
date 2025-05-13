@@ -1,5 +1,6 @@
-;; org-bullets
+;; org-bullets  -*- lexical-binding: t; -*-
 ;; 美化org的标题展示
+;;; Code:
 (use-package org-bullets)
 (add-hook 'org-mode-hook 'org-bullets-mode)
 ;; org-agenda

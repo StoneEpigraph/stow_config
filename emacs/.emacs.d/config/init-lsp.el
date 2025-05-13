@@ -1,4 +1,4 @@
-;;; Package --- summary
+;;; Package --- summary  -*- lexical-binding: t; -*-
 ;;; Commentary:
 ;; set prefix for lsp-command-keymap (few alternatives - "C-l", "C-c l")
 ;;; code:

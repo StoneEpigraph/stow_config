@@ -173,10 +173,10 @@
   (global-set-key (kbd "C-c C-<") 'mc/mark-all-like-this))
 
 ;; dict
-(use-package youdao-dictionary
-  :config
-  (setq url-automatic-caching t)
-  (global-set-key (kbd "C-c y") 'youdao-dictionary-search-at-point+))
+;; (use-package youdao-dictionary
+;;   :config
+;;   (setq url-automatic-caching t)
+;;   (global-set-key (kbd "C-c y") 'youdao-dictionary-search-at-point+))
 
 ;; multiple-cursors
 (use-package multiple-cursors

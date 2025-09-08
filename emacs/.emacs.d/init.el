@@ -248,7 +248,7 @@
 		      swiper treemacs-icons-dired treemacs-persp
 		      treemacs-projectile treesit-auto vertico w3m
 		      web-mode wgrep which-key window-numbering
-		      yasnippet-snippets youdao-dictionary))
+		      yasnippet-snippets ))
  '(treemacs-show-hidden-files t))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.

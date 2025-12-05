@@ -243,7 +243,7 @@
 		      keycast keyfreq lsp-python-ms lsp-treemacs
 		      lsp-ui marginalia mood-one-theme
 		      multiple-cursors orderless org-bullets
-		      org-download org-roam-ui ox-hugo pandoc-mode
+		      org-download ox-hugo pandoc-mode
 		      rainbow-delimiters rg rust-mode smartparens
 		      swiper treemacs-icons-dired treemacs-persp
 		      treemacs-projectile treesit-auto vertico w3m

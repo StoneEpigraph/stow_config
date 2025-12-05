@@ -1,5 +1,15 @@
 [v1]
 "cargo-generate 0.21.2 (registry+https://github.com/rust-lang/crates.io-index)" = ["cargo-generate"]
 "cargo-readme 3.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = ["cargo-readme"]
-"create-tauri-app 4.5.9 (registry+https://github.com/rust-lang/crates.io-index)" = ["cargo-create-tauri-app"]
+"cargo-udeps 0.1.57 (registry+https://github.com/rust-lang/crates.io-index)" = ["cargo-udeps"]
+"cargo-xwin 0.20.2 (registry+https://github.com/rust-lang/crates.io-index)" = ["cargo-xwin"]
+"create-tauri-app 4.6.2 (registry+https://github.com/rust-lang/crates.io-index)" = ["cargo-create-tauri-app"]
+"sea-orm-cli 1.1.16 (registry+https://github.com/rust-lang/crates.io-index)" = [
+    "sea",
+    "sea-orm-cli",
+]
+"sqlx-cli 0.8.6 (registry+https://github.com/rust-lang/crates.io-index)" = [
+    "cargo-sqlx",
+    "sqlx",
+]
 "wasm-pack 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)" = ["wasm-pack"]

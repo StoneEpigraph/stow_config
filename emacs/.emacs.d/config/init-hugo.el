@@ -1,5 +1,6 @@
 ;;; hugo config  -*- lexical-binding: t; -*-
 
+(require 'tomelr)
 (use-package ox-hugo
   :ensure t
   :pin melpa

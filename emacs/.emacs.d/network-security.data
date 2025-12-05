@@ -1,4 +1,4 @@
 ;;;; -*- mode: lisp-data -*-
 (
- (:id "sha1:70763ce07d52a091b0536b2075e1e6382b641aaa" :fingerprints ("sha1:a2:22:e6:f2:bb:84:ea:63:0a:bf:54:22:c9:83:19:e6:55:ed:2d:89") :host "img1.doubanio.com:443" :conditions (:revocation-data-superseded :invalid :verify-cert))
+ (:id "sha1:70763ce07d52a091b0536b2075e1e6382b641aaa" :fingerprints ("sha1:a2:22:e6:f2:bb:84:ea:63:0a:bf:54:22:c9:83:19:e6:55:ed:2d:89" "sha1:d7:94:03:64:35:60:a1:5f:94:fc:9d:ec:05:ca:b0:41:e2:fc:fa:83") :host "img1.doubanio.com:443" :conditions (:revocation-data-superseded :invalid :verify-cert))
 )

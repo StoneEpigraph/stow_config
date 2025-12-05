@@ -130,3 +130,6 @@ export QT_IM_MODULE=fcitx5
 
 # moonbit
 export PATH="$HOME/.moon/bin:$PATH"
+
+# moonbit
+export PATH="$HOME/.moon/bin:$PATH"

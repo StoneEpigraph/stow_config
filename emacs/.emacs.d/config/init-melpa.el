@@ -3,9 +3,9 @@
 ;; setting source
 (require 'package)
 (setq package-archives '(
-			 ;; ("gnu"   . "http://mirrors.tuna.tsinghua.edu.cn/elpa/gnu/")
+			  ("gnu"   . "http://mirrors.tuna.tsinghua.edu.cn/elpa/gnu/")
                           ("melpa" . "https://melpa.org/packages/")
- 			  ;; ("org"   . "http://mirrors.tuna.tsinghua.edu.cn/elpa/)
+ 			  ("org"   . "http://mirrors.tuna.tsinghua.edu.cn/elpa/")
 			  ))
 ;;(setq package-archives '(("gnu" . "http://elpa.emacs-china.org/gnu/")
 ;;			("melpa" . "http://elpa.emacs-china.org/melpa/")

@@ -169,4 +169,32 @@
   (interactive)
   (org-id-get-create)
   (gen_hugo_title))
+
+;; Show Org Agenda tasks with heigh spacing based on clock time with `org-agenda-log-mode'.
+;; https://emacs-china.org/t/org-agenda/8679
+;; work with org-agenda dispatcher [c] "Today Clocked Tasks" to view today's 
+(defun org-agenda-time-grid-colorful-spacing ()
+  "Set different line spacing w.r.t. time duration."
+  (save-excursion
+    ;; (list "#aa557f" "DarkGreen" "DarkSlateGray" "DarkSlateBlue") ; dark theme
+    ;; (list "#F6B1C3" "#FFFF9D" "#BEEB9F" "#ADD5F7") ; white theme
+    (let* ((colors (list "#aa557f" "DarkGreen" "DarkSlateGray" "DarkSlateBlue"))
+           pos
+           duration)
+      (nconc colors colors)
+      (goto-char (point-min))
+      (while (setq pos (next-single-property-change (point) 'duration))
+        (goto-char pos)
+        (when (and (not (equal pos (point-at-eol)))
+                   (setq duration (org-get-at-bol 'duration)))
+          ;; larger duration bar height
+          (let ((line-height (if (< duration 15) 1.0 (+ 0.5 (/ duration 30))))
+                (ov (make-overlay (point-at-bol) (1+ (point-at-eol)))))
+            (overlay-put ov 'face `(:background ,(car colors) :foreground 
+"black"))
+            (setq colors (cdr colors))
+            (overlay-put ov 'line-height line-height)
+            (overlay-put ov 'line-spacing (1- line-height))))))))
+
+(add-hook 'org-agenda-finalize-hook #'org-agenda-time-grid-colorful-spacing)
 (provide 'init-org)

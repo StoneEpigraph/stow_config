@@ -11,6 +11,7 @@
 (require 'init-hugo)
 (require 'init-mode)
 (require 'init-custom)
+(require 'init-md)
 ;; set auto generate code into custom.el
 (setq custom-file (expand-file-name "custom.el" user-emacs-directory))
 (load custom-file)

@@ -221,18 +221,7 @@
      "/home/stone/resource/dailyNotes/dailyRoutine/Star/resources.org"
      "/home/stone/resource/dailyNotes/todolist.org"))
  '(org-agenda-insert-diary-extract-time nil)
- '(package-selected-packages
-   '(backup-each-save baidu-translate company eaf-markmap elfeed
-		      embark-consult epc flycheck flymd fzf
-		      indent-guide keycast keyfreq lsp-python-ms
-		      lsp-treemacs lsp-ui marginalia mood-one-theme
-		      multiple-cursors orderless org-bullets
-		      org-download org-roam-ui ox-hugo pandoc-mode
-		      rainbow-delimiters rg rust-mode smartparens
-		      swiper treemacs-icons-dired treemacs-persp
-		      treemacs-projectile treesit-auto vertico w3m
-		      web-mode wgrep which-key window-numbering
-		      yasnippet-snippets))
+ '(package-selected-packages nil)
  '(treemacs-show-hidden-files t))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.

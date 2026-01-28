@@ -1,0 +1,35 @@
+{
+  "version": 3,
+  "skills": {
+    "vue-best-practices": {
+      "source": "hyf0/vue-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/hyf0/vue-skills.git",
+      "skillPath": "skills/vue-best-practices/SKILL.md",
+      "skillFolderHash": "ceccddef5eb6872c5dc4566666152ba54939bd0f",
+      "installedAt": "2026-01-28T00:56:06.771Z",
+      "updatedAt": "2026-01-28T00:56:06.771Z"
+    },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/vercel-labs/skills.git",
+      "skillPath": "skills/find-skills/SKILL.md",
+      "skillFolderHash": "c2f31172b6f256272305a5e6e7228b258446899f",
+      "installedAt": "2026-01-28T00:56:16.640Z",
+      "updatedAt": "2026-01-28T00:56:16.640Z"
+    },
+    "tauri": {
+      "source": "martinholovsky/claude-skills-generator",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/martinholovsky/claude-skills-generator.git",
+      "skillPath": "skills/tauri/SKILL.md",
+      "skillFolderHash": "d706d90cf835b7d3832564f0c676d6a917477755",
+      "installedAt": "2026-01-28T00:58:42.477Z",
+      "updatedAt": "2026-01-28T00:58:42.477Z"
+    }
+  },
+  "dismissed": {
+    "findSkillsPrompt": true
+  }
+}

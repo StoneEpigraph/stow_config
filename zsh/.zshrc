@@ -133,3 +133,7 @@ export PATH="$HOME/.moon/bin:$PATH"
 
 # moonbit
 export PATH="$HOME/.moon/bin:$PATH"
+
+# rsproxy
+export RUSTUP_DIST_SERVER="https://rsproxy.cn"
+export RUSTUP_UPDATE_ROOT="https://rsproxy.cn/rustup"

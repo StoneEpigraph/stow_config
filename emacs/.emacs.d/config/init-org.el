@@ -73,7 +73,10 @@
   (org-roam-db-autosync-mode))
 ;; org-roam-ui
 (setq org-roam-v2-ack t)
-(use-package org-roam-ui)
+(use-package org-roam-ui
+  :config
+  (require 'emacsql)
+  )
 (setq org-roam-directory "/home/stone/resource/dailyNotes/")
 ;;	(add-to-list 'load-path "~/.emacs.d/private/org-roam-ui")
 ;;	(load-library "org-roam-ui")

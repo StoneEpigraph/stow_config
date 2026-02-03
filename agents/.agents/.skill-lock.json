@@ -27,6 +27,60 @@
       "skillFolderHash": "d706d90cf835b7d3832564f0c676d6a917477755",
       "installedAt": "2026-01-28T00:58:42.477Z",
       "updatedAt": "2026-01-28T00:58:42.477Z"
+    },
+    "vue-development-guides": {
+      "source": "vuejs-ai/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/vuejs-ai/skills.git",
+      "skillPath": "skills/vue-development-guides/SKILL.md",
+      "skillFolderHash": "c338d30b39e4fec106d3e0284b04476bf200a085",
+      "installedAt": "2026-01-28T14:30:44.215Z",
+      "updatedAt": "2026-01-28T14:30:44.215Z"
+    },
+    "docx": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/anthropics/skills.git",
+      "skillPath": "skills/docx/SKILL.md",
+      "skillFolderHash": "1e885d469740a354c45677fb3fa0ed66acba511d",
+      "installedAt": "2026-01-28T14:49:36.033Z",
+      "updatedAt": "2026-01-28T14:49:36.033Z"
+    },
+    "pptx": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/anthropics/skills.git",
+      "skillPath": "skills/pptx/SKILL.md",
+      "skillFolderHash": "744bc44ba6edd58d6376374206be1fd4b1c8697d",
+      "installedAt": "2026-01-28T14:50:29.463Z",
+      "updatedAt": "2026-01-28T14:50:29.463Z"
+    },
+    "pdf": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/anthropics/skills.git",
+      "skillPath": "skills/pdf/SKILL.md",
+      "skillFolderHash": "f3e7babdd8d9cc8b5627311c16e07f1218c39bff",
+      "installedAt": "2026-01-28T14:50:58.616Z",
+      "updatedAt": "2026-01-28T14:50:58.616Z"
+    },
+    "xlsx": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/anthropics/skills.git",
+      "skillPath": "skills/xlsx/SKILL.md",
+      "skillFolderHash": "489906b7d9057e0c371e21467e1a9f96f40be387",
+      "installedAt": "2026-01-28T14:51:24.803Z",
+      "updatedAt": "2026-01-28T14:51:24.803Z"
+    },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/anthropics/skills.git",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "skillFolderHash": "928950704df8a8b885c03de5da626331e6f29cf8",
+      "installedAt": "2026-01-28T14:52:40.371Z",
+      "updatedAt": "2026-01-28T14:52:40.371Z"
     }
   },
   "dismissed": {

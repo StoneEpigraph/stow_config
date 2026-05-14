@@ -17,7 +17,7 @@
       "skillPath": "skills/find-skills/SKILL.md",
       "skillFolderHash": "c2f31172b6f256272305a5e6e7228b258446899f",
       "installedAt": "2026-01-28T00:56:16.640Z",
-      "updatedAt": "2026-01-28T00:56:16.640Z"
+      "updatedAt": "2026-02-04T12:53:59.728Z"
     },
     "tauri": {
       "source": "martinholovsky/claude-skills-generator",
@@ -85,5 +85,10 @@
   },
   "dismissed": {
     "findSkillsPrompt": true
-  }
+  },
+  "lastSelectedAgents": [
+    "claude-code",
+    "opencode",
+    "codex"
+  ]
 }

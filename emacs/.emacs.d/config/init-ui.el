@@ -33,9 +33,9 @@
 ;; (add-to-list 'default-frame-alist '(fullscreen . maximized))
 ;; 指定启动大小
 (add-to-list 'default-frame-alist '(width . 247))
-(add-to-list 'default-frame-alist '(height . 68))
-(add-to-list 'default-frame-alist '(top . 50))
-(add-to-list 'default-frame-alist '(left . 100))
+(add-to-list 'default-frame-alist '(height . 66))
+(add-to-list 'default-frame-alist '(top . 80))
+(add-to-list 'default-frame-alist '(left . 40))
 (set-frame-parameter (selected-frame) 'alpha '(95 80))
 
 

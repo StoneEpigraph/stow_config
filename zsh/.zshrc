@@ -139,4 +139,7 @@ export RUSTUP_DIST_SERVER="https://rsproxy.cn"
 export RUSTUP_UPDATE_ROOT="https://rsproxy.cn/rustup"
 
 # icode-cli
-export PATH="/home/stone/.icode/bin:$PATH"
+export PATH="/home/stone/.target/release:/home/stone/.icode/bin:$PATH"
+
+# OpenClaw Completion
+source "/home/stone/.openclaw/completions/openclaw.zsh"

@@ -1,0 +1,24 @@
+{
+    "modules": [
+        "title",
+        "separator",
+        {
+            "type": "custom",
+            "format": "=== 系统信息 ===",
+            "output": "System Info"
+        },
+        "os",
+        "host",
+        "kernel",
+        "uptime",
+        {
+            "type": "custom",
+            "format": "=== 硬件信息 ===",
+            "output": "Hardware Info"
+        },
+        "cpu",
+        "gpu",
+        "memory",
+        "disk"
+    ]
+}

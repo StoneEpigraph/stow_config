@@ -12,6 +12,7 @@
 (require 'init-mode)
 (require 'init-custom)
 (require 'init-md)
+(require 'init-config-reset)
 ;; set auto generate code into custom.el
 (setq custom-file (expand-file-name "custom.el" user-emacs-directory))
 (load custom-file)

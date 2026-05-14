@@ -137,3 +137,6 @@ export PATH="$HOME/.moon/bin:$PATH"
 # rsproxy
 export RUSTUP_DIST_SERVER="https://rsproxy.cn"
 export RUSTUP_UPDATE_ROOT="https://rsproxy.cn/rustup"
+
+# icode-cli
+export PATH="/home/stone/.icode/bin:$PATH"

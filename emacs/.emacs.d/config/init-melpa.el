@@ -24,6 +24,7 @@
 (eval-when-compile
   (require 'use-package))
 (setq use-package-always-ensure t)
+(setq package-install-upgrade-built-in t)
 
 ;; set major mode
 

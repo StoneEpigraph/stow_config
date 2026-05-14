@@ -4,3 +4,6 @@ fi
 export FZF_DEFAULT_COMMAND="fd --exclude={.git,.idea,.sass-cache,node_modules,build} --type f"
 alias sz="lrzsz-sz"
 alias rz="lrzsz-rz"
+
+# uv
+export PATH="/home/stone/.local/bin:$PATH"

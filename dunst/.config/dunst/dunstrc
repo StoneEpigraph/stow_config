@@ -1,0 +1,139 @@
+# dunstrc —— 茶的个人配置
+# 由 stow 管理：真实文件在 ~/stow_config/dunst/.config/dunst/dunstrc
+# 定位：niri / dwm 等非 Plasma 会话下的通知守护（Plasma 会话请不要启动 dunst，
+#       否则会和 plasmashell 抢 org.freedesktop.Notifications 这个名字）
+#
+# 设计目标：通知绝不无限堆积。三条防线：
+#   1) notification_limit  —— 同屏最多几条，多出来的排队而不是铺满屏幕
+#   2) 三个 urgency 的 timeout —— 默认 5 / 15 / 30 秒
+#   3) match_dbus_timeout 规则 —— 把应用传来的 "永不超时" 按成 15 秒（见文件末尾）
+#
+# 改完执行：dunstctl reload   （或 killall dunst，D-Bus 会自动拉起）
+
+[global]
+    # ---------- 位置与尺寸 ----------
+    monitor = 0
+    follow = mouse
+    width = 380
+    height = 300
+    origin = top-right
+    offset = 12x48
+    scale = 0
+
+    # ---------- 防堆积核心 ----------
+    # 同屏最多显示 5 条，其余的挂起等待；配合 indicate_hidden 会提示还有几条被藏起来
+    notification_limit = 5
+    indicate_hidden = yes
+    # 内容完全相同的通知合并计数，而不是并排堆一列
+    stack_duplicates = true
+    hide_duplicate_count = no
+    sort = yes
+    # 【重要】鼠标悬停在通知上时，不暂停超时计时。
+    # dunst 默认就是 false，这里显式写死，防止以后被改回去。
+    # 这正是「放着不管反而永远不消失」的元凶之一。
+    pause_on_mouse_over = false
+
+    # ---------- 外观（对齐 ghostty: Tomorrow Night Eighties / bg #282c34） ----------
+    frame_width = 2
+    frame_color = "#6699cc"
+    separator_height = 2
+    separator_color = frame
+    padding = 12
+    horizontal_padding = 14
+    text_icon_padding = 0
+    gap_size = 6
+    corner_radius = 6
+    corners = all
+    transparency = 0
+    font = monospace 10
+    line_height = 0
+    markup = full
+    format = "<b>%s</b>\n%b"
+    alignment = left
+    vertical_alignment = center
+    icon_position = left
+    min_icon_size = 0
+    max_icon_size = 64
+    icon_path = /usr/share/icons/Adwaita/16x16/status/:/usr/share/icons/Adwaita/16x16/devices/:/usr/share/icons/breeze/status/22/:/usr/share/icons/breeze/devices/22/
+    show_indicators = yes
+
+    # ---------- 行为 ----------
+    idle_threshold = 120
+    show_age_threshold = 60
+    ellipsize = middle
+    ignore_newline = no
+    always_run_script = true
+    title = Dunst
+    class = Dunst
+    # 不忽略应用主动发来的 CloseNotification（保持默认）
+    ignore_dbusclose = false
+    # 强制走 XWayland 通知通道（默认关即可）
+    force_xwayland = false
+
+    # ---------- 历史 ----------
+    sticky_history = yes
+    history_length = 20
+
+    # ---------- 鼠标操作 ----------
+    mouse_left_click = close_current
+    mouse_middle_click = do_action, close_current
+    mouse_right_click = close_all
+
+    # ---------- 外部工具（不装 dmenu 就把这行注释掉） ----------
+    # dmenu = /usr/bin/dmenu -p dunst:
+    browser = /usr/bin/xdg-open
+
+# ============================================================
+# 三个紧急度：超时时间就是这里的 timeout（单位：秒）
+# ============================================================
+[urgency_low]
+    background = "#282c34"
+    foreground = "#8a8f98"
+    frame_color = "#99cc99"
+    highlight = "#ffcc66"
+    timeout = 5
+    default_icon = dialog-information
+
+[urgency_normal]
+    background = "#282c34"
+    foreground = "#ffffff"
+    frame_color = "#6699cc"
+    highlight = "#ffcc66"
+    timeout = 15
+    default_icon = dialog-information
+
+[urgency_critical]
+    background = "#282c34"
+    foreground = "#ffffff"
+    frame_color = "#f2777a"
+    highlight = "#ffcc66"
+    timeout = 30
+    default_icon = dialog-warning
+
+# ============================================================
+# 规则
+# 规则的匹配条件是「与」关系；override_dbus_timeout 优先级高于 timeout
+# ============================================================
+
+# 【关键】捕获「传了 timeout=0」的通知并强制超时。
+# 浏览器和不少 Electron 应用会通过 D-Bus 传 timeout=0，含义是「永不关闭」。
+# 这类通知正是堆积卡死的头号来源。这条规则把它们一律压成 15 秒。
+[force-timeout-on-never-expire]
+    match_dbus_timeout = 0
+    override_dbus_timeout = 15
+
+# 【可选】把浏览器通知全部压到 15 秒。
+# 有些网页应用会传很长的超时（25 秒甚至 10 分钟）。想统一压掉就取消注释。
+# desktop_entry 支持 shell 通配。
+# [browser-override]
+#     desktop_entry = "*chrom*"
+#     override_dbus_timeout = 15
+#
+# [browser-override-firefox]
+#     desktop_entry = "firefox"
+#     override_dbus_timeout = 15
+
+# 【可选】彻底静音某个爱刷屏的应用：把它的通知直接丢进历史，不弹窗。
+# [silent-motrix]
+#     desktop_entry = "motrix"
+#     skip_display = true

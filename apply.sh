@@ -43,11 +43,9 @@ CONFLICT_TARGETS=(
   ".workbuddy/USER.md"
 )
 
-# 历史遗留、已确定断掉的软链（仅 --prune 时处理）
-PRUNE_TARGETS=(
-  ".config/neofetch"            # 对应的包目录早已不存在
-  ".config/gitui/theme.ron.old"
-)
+# 历史遗留、指向本仓库但目标已不存在的坏软链（仅 --prune 时处理）
+# 不写死具体路径：自动扫描，包删掉之后残留的链接都能被清掉。
+PRUNE_SCAN_DEPTH=4
 
 # --adopt 时「系统 -> 仓库」的映射表： 相对$HOME路径 : 相对仓库路径
 ADOPT_MAP=(
@@ -147,15 +145,25 @@ else
 fi
 
 # --- 5) 可选：清理历史遗留坏链 --------------------------------------------
+# 「包目录删了、但 $HOME 下的软链还在」会留下断链。
+# 扫描 $HOME 下有限深度内、指向本仓库却已断掉的软链，逐个清掉。
 if [ "$PRUNE" = 1 ]; then
-  log "--prune：清理历史遗留坏链"
-  for t in "${PRUNE_TARGETS[@]}"; do
-    p="$TARGET/$t"
-    if [ -L "$p" ] && [ ! -e "$p" ]; then
-      [ "$GO" = 1 ] && rm -f "$p"
-      item "$([ "$GO" = 1 ] && echo 已删除 || echo '(预演) 将删除') $p"
-    fi
-  done
+  log "--prune：清理目标已不存在的仓库软链"
+  REPO_BASE="$(basename "$REPO")"
+  scan="$(mktemp)"
+  find "$TARGET" -maxdepth "$PRUNE_SCAN_DEPTH" -xtype l 2>/dev/null > "$scan" || true
+  found=0
+  while IFS= read -r link; do
+    tgt="$(readlink "$link" 2>/dev/null || true)"
+    case "$tgt" in
+      *"$REPO_BASE"/*) ;;        # 指向本仓库的断链，需要处理
+      *) continue ;;
+    esac
+    found=1
+    if [ "$GO" = 1 ]; then rm -f "$link"; item "已删除: ${link#$TARGET/}"; else item "(预演) 将删除: ${link#$TARGET/}"; fi
+  done < "$scan"
+  rm -f "$scan"
+  [ "$found" = 0 ] && item "没有发现坏链"
 fi
 
 log "完成。回滚方式：把 $BACKUP 里的文件拷回原位并删除对应软链。"

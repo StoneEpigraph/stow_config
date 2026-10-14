@@ -142,4 +142,6 @@ export RUSTUP_UPDATE_ROOT="https://rsproxy.cn/rustup"
 export PATH="/home/stone/.target/release:/home/stone/.icode/bin:$PATH"
 
 # OpenClaw Completion
-source "/home/stone/.openclaw/completions/openclaw.zsh"
+# source "/home/stone/.openclaw/completions/openclaw.zsh"
+export PATH="/home/stone/.icode/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"

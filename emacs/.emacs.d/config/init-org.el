@@ -39,12 +39,12 @@
 (add-hook 'org-mode-hook (lambda () (setq truncate-lines t)))
 
 ;; org-download
-(use-package org-download
-  :ensure t
-  :bind ("C-x y" . org-download-screenshot)
-  :config
-  (add-hook 'dired-mode-hook 'org-download-enable)
-)
+;;(use-package org-download
+;;  :ensure t
+;;  :bind ("C-x y" . org-download-screenshot)
+;;  :config
+;;  (add-hook 'dired-mode-hook 'org-download-enable)
+;;)
 
 (setq-default org-download-image-dir "./img")
 
@@ -95,7 +95,7 @@
 ;;; (setq-default org-download-image-dir "~/Pictures/foo")
 
 ;; 启动缩进
-(add-hook 'org-mode-hook 'org-indent-mode)
+;; (add-hook 'org-mode-hook 'org-indent-mode)
 ;; 更新org-mode的字体设置
 ;;	(let ((emacs-font-size 14)
 ;;	      (emacs-font-name "WenQuanYi Micro Hei Mono"))
@@ -200,4 +200,40 @@
             (overlay-put ov 'line-spacing (1- line-height))))))))
 
 (add-hook 'org-agenda-finalize-hook #'org-agenda-time-grid-colorful-spacing)
+;; 查看 org-lint 报告的错误
+(defun my/show-org-lint-errors ()
+  "显示 org-lint 报告的错误"
+  (interactive)
+  
+  ;; 临时启用 org-lint
+  (when (fboundp 'flycheck-enable-checker)
+    (flycheck-enable-checker 'org/org-lint))
+  
+  ;; 运行检查
+  (flycheck-buffer)
+  
+  ;; 显示错误列表
+  (if (fboundp 'flycheck-list-errors)
+      (flycheck-list-errors)
+    (message "使用 M-x flycheck-list-errors 查看错误")))
+
+;; 查看前 N 个错误
+(defun my/show-top-org-lint-errors (&optional n)
+  "显示前 N 个 org-lint 错误"
+  (interactive "P")
+  (let ((limit (or n 10)))
+    (with-temp-buffer
+      (insert (format "=== 前 %d 个 org-lint 错误 ===\n\n" limit))
+      
+      (condition-case err
+          (progn
+            (when (fboundp 'org-lint)
+              (let ((errors (org-lint (current-buffer))))
+                (dotimes (i (min limit (length errors)))
+                  (let ((error (nth i errors)))
+                    (insert (format "%d. %s\n" (1+ i) error)))))))
+        (error
+         (insert (format "无法获取错误: %s\n" err))))
+      
+      (switch-to-buffer-other-window (current-buffer)))))
 (provide 'init-org)

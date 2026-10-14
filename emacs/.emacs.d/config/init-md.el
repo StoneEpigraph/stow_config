@@ -1,4 +1,4 @@
-
+;;; -*- lexical-binding: t; -*-
 ;;; code
 ;; FLYMD
 (use-package flymd

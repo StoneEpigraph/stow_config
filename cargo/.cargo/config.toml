@@ -3,10 +3,19 @@ registry = "https://github.com/rust-lang/crates.io-index"
 replace-with = 'tuna'
 
 [source.tuna]
-registry = "https://mirrors.tuna.tsinghua.edu.cn/git/crates.io-index.git"
+registry = "https://mirrors.tuna.tsinghua.edu.cn/git/crates.io-index/"
 
 [source.ustc]
-registry = "git://mirrors.ustc.edu.cn/crates.io-index"
+registry = "git://mirrors.ustc.edu.cn/crates.io-index/"
+
+[source.rsproxy-sparese]
+registry = "https://rsproxy.cn/index/"
+
+[source.rsproxy]
+registry = "https://rsproxy.cn/crates.io-index/"
 
 [build]
 target-dir = "/home/stone/.target"
+
+[net]
+git-fetch-with-cli = true

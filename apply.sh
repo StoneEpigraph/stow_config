@@ -8,7 +8,7 @@
 #   ./apply.sh               # 预演（dry-run），只打印会做什么，不动文件
 #   ./apply.sh --go          # 真正执行；冲突的实体文件先备份到 ~/.stow_backup-<时间戳>/
 #   ./apply.sh --go --adopt  # 执行前，先把系统上更新的实体文件反向收进仓库
-#   ./apply.sh --go --prune  # 顺带清理历史遗留的坏软链（pkg 已删除的旧链接）
+#   ./apply.sh --go --prune  # 顺带清理指向本仓库的孤儿软链（断链 + 手工重复链）
 #   ./apply.sh --go --restow # 用 stow -R 重新收拢目录链接（会重建已有链，谨慎）
 #
 # 设计要点：
@@ -41,10 +41,10 @@ CONFLICT_TARGETS=(
   ".workbuddy/IDENTITY.md"
   ".workbuddy/SOUL.md"
   ".workbuddy/USER.md"
+  ".workbuddy/BOOTSTRAP.md"
 )
 
-# 历史遗留、指向本仓库但目标已不存在的坏软链（仅 --prune 时处理）
-# 不写死具体路径：自动扫描，包删掉之后残留的链接都能被清掉。
+# --prune 时扫描 $HOME 的最大深度（只往软链可能出现的常见层级里找）
 PRUNE_SCAN_DEPTH=4
 
 # --adopt 时「系统 -> 仓库」的映射表： 相对$HOME路径 : 相对仓库路径
@@ -144,26 +144,43 @@ else
   log "确认无误后执行:  ./apply.sh --go"
 fi
 
-# --- 5) 可选：清理历史遗留坏链 --------------------------------------------
-# 「包目录删了、但 $HOME 下的软链还在」会留下断链。
-# 扫描 $HOME 下有限深度内、指向本仓库却已断掉的软链，逐个清掉。
+# 该相对路径是否是某个包里的正式条目？
+# 是的话说明这条软链就是 stow 建的正规链，必须保留。
+is_package_entry() {
+  local rel="$1" p
+  for p in "${PACKAGES[@]}"; do
+    if [ -e "$REPO/$p/$rel" ] || [ -L "$REPO/$p/$rel" ]; then return 0; fi
+  done
+  return 1
+}
+
+# --- 5) 可选：清理孤儿软链 -------------------------------------------------
+# 指向本仓库、但「不属于任何包」的软链，分两类：
+#   a) 断链   —— 链接目标已不存在（包被删掉后留下的）
+#   b) 重复链 —— 目标还在，但该路径不是任何包的条目
+#                （典型：手工 ln -s 出来的 xxx.bak / xxx.old / .zshrc.pre-xxx）
+# 两者都不携带信息：前者目标已无，后者的内容要么等同于正式条目、
+# 要么本来就在 git 历史里。删之前仍会逐条打印，且默认是预演。
 if [ "$PRUNE" = 1 ]; then
-  log "--prune：清理目标已不存在的仓库软链"
+  log "--prune：清理指向本仓库的孤儿软链"
   REPO_BASE="$(basename "$REPO")"
   scan="$(mktemp)"
-  find "$TARGET" -maxdepth "$PRUNE_SCAN_DEPTH" -xtype l 2>/dev/null > "$scan" || true
+  find "$TARGET" -maxdepth "$PRUNE_SCAN_DEPTH" -type l 2>/dev/null > "$scan" || true
   found=0
   while IFS= read -r link; do
     tgt="$(readlink "$link" 2>/dev/null || true)"
     case "$tgt" in
-      *"$REPO_BASE"/*) ;;        # 指向本仓库的断链，需要处理
+      *"$REPO_BASE"/*) ;;      # 指向本仓库
       *) continue ;;
     esac
+    rel="${link#$TARGET/}"
+    is_package_entry "$rel" && continue
+    if [ -e "$link" ]; then why="重复链"; else why="断链"; fi
     found=1
-    if [ "$GO" = 1 ]; then rm -f "$link"; item "已删除: ${link#$TARGET/}"; else item "(预演) 将删除: ${link#$TARGET/}"; fi
+    if [ "$GO" = 1 ]; then rm -f "$link"; item "已删除($why): $rel"; else item "(预演) 将删除($why): $rel"; fi
   done < "$scan"
   rm -f "$scan"
-  [ "$found" = 0 ] && item "没有发现坏链"
+  [ "$found" = 0 ] && item "没有发现孤儿软链"
 fi
 
 log "完成。回滚方式：把 $BACKUP 里的文件拷回原位并删除对应软链。"

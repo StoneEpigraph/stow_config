@@ -1,0 +1,194 @@
+// Zed settings
+//
+// For information on how to configure Zed, see the Zed
+// documentation: https://zed.dev/docs/configuring-zed
+//
+// To see all of Zed's default settings without changing your
+// custom settings, run the `open default settings` command
+// from the command palette or from `Zed` application menu.
+{
+  "language_models": {
+    "openai_compatible": {
+      "ark-coding-plan": {
+        "api_url": "https://ark.cn-beijing.volces.com/api/coding/v3",
+        "available_models": [
+          {
+            "name": "ark-code-latest",
+            "max_tokens": 200000,
+            "max_output_tokens": 32000,
+            "max_completion_tokens": 256000,
+            "capabilities": {
+              "tools": true,
+              "images": false,
+              "parallel_tool_calls": false,
+              "prompt_cache_key": false,
+              "chat_completions": true,
+              "interleaved_reasoning": false,
+              "max_tokens_parameter": false
+            }
+          }
+        ]
+      }
+    }
+  },
+  "cli_default_open_behavior": "new_window",
+  "agent_servers": {
+    "github-copilot-cli": {
+      "type": "registry"
+    }
+  },
+  "project_panel": {
+    "dock": "left"
+  },
+  "outline_panel": {
+    "dock": "left"
+  },
+  "collaboration_panel": {
+    "dock": "left"
+  },
+  "git_panel": {
+    "dock": "left"
+  },
+  "vim_mode": true,
+  "agent": {
+    "sandbox_permissions": {
+      "network_hosts": [
+        "pypi.org",
+        "files.pythonhosted.org",
+        "registry.yarnpkg.com",
+        "registry.npmjs.org",
+        "registry.npmmirror.com",
+        "cdn.npmmirror.com",
+        "maven.aliyun.com",
+        "packages.aliyun.com"
+      ],
+      "write_paths": [
+        {
+          "requested": "/home/stone/.cache/uv",
+          "resolved": "/home/stone/.cache/uv"
+        },
+        {
+          "requested": "/home/stone/.npm",
+          "resolved": "/home/stone/.npm"
+        },
+        {
+          "requested": "/home/stone/.m2/repository",
+          "resolved": "/home/stone/.m2/repository"
+        }
+      ]
+    },
+    "tool_permissions": {
+      "tools": {
+        "terminal": {
+          "always_allow": [
+            {
+              "pattern": "^grep\\b"
+            },
+            {
+              "pattern": "^echo\\s+NO(\\s|$)"
+            },
+            {
+              "pattern": "^mvn\\b"
+            },
+            {
+              "pattern": "^python3\\b"
+            },
+            {
+              "pattern": "^ls\\s+/usr/lib/jvm/(\\s|$)"
+            },
+            {
+              "pattern": "^echo\\b"
+            },
+            {
+              "pattern": "^ls\\s+/opt(\\s|$)"
+            },
+            {
+              "pattern": "^java\\b"
+            },
+            {
+              "pattern": "^JAVA_HOME=/usr/lib/jvm/java-17-openjdk\\s+mvn(\\s|$)"
+            },
+            {
+              "pattern": "^git\\b"
+            },
+            {
+              "pattern": "^ls\\s+/home/stone/\\.m2/repository/org/jsoup/jsoup/(\\s|$)"
+            },
+            {
+              "pattern": "^find\\s+\\~/\\.npm/_npx(\\s|$)"
+            },
+            {
+              "pattern": "^head\\b"
+            },
+            {
+              "pattern": "^ls\\s+node_modules/\\.bin/(\\s|$)"
+            },
+            {
+              "pattern": "^file\\s+node_modules/\\.bin/tauri(\\s|$)"
+            },
+            {
+              "pattern": "^ls\\s+node_modules/@tauri-apps/cli-\\*(\\s|$)"
+            },
+            {
+              "pattern": "^find\\s+node_modules(\\s|$)"
+            },
+            {
+              "pattern": "^ls\\b"
+            },
+            {
+              "pattern": "^strings\\s+node_modules/@tauri-apps/cli-linux-x64-gnu/cli\\.linux-x64-gnu\\.node(\\s|$)"
+            },
+            {
+              "pattern": "^sort\\b"
+            },
+            {
+              "pattern": "^curl\\b"
+            },
+            {
+              "pattern": "^TAURI_BUNDLER_TOOLS_GITHUB_MIRROR=https://gh-proxy\\.com/\\s+npx\\s+tauri(\\s|$)"
+            },
+            {
+              "pattern": "^tail\\b"
+            },
+            {
+              "pattern": "^makepkg\\b"
+            },
+            {
+              "pattern": "^echo\\s+PKGBUILD(\\s|$)"
+            },
+            {
+              "pattern": "^du\\b"
+            },
+            {
+              "pattern": "^find\\s+/home/stone/\\.target/release/bundle/appimage/SMU\\.AppDir(\\s|$)"
+            },
+            {
+              "pattern": "^mkdir\\b"
+            },
+            {
+              "pattern": "^tar\\s+czf(\\s|$)"
+            },
+            {
+              "pattern": "^cp\\s+PKGBUILD(\\s|$)"
+            },
+            {
+              "pattern": "^ls\\s+/tmp/arch-test/(\\s|$)"
+            }
+          ]
+        }
+      }
+    },
+    "dock": "right",
+    "default_model": {
+      "provider": "ark-coding-plan",
+      "model": "ark-code-latest"
+    },
+    "model_parameters": []
+  },
+  "telemetry": {
+    "diagnostics": false,
+    "metrics": false
+  },
+  "ui_font_size": 16,
+  "buffer_font_size": 16
+}

@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+"""qBittorrent 完成任务钩子。
+
+qBittorrent 在某个种子下载完成时调用本脚本，把这一条记进历史库。
+只有"下载完成"的任务会入库，正在下载的一律跳过。
+
+由 `qbhist hook` 写入 qBittorrent.conf：
+  [AutoRun]
+  OnTorrentFinished\\Enabled=true
+  OnTorrentFinished\\Program=<本脚本> %I
+
+手动测试：qbhist-on-finish <info_hash>
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+import time
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+
+import qbhist_core as core  # noqa: E402
+
+
+def log(msg: str) -> None:
+    p = core.home() / ".local/share/qb-history/finish.log"
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        if p.exists() and p.stat().st_size > 512 * 1024:
+            p.replace(p.with_name("finish.log.1"))
+        with p.open("a", encoding="utf-8") as f:
+            f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}\n")
+    except Exception:
+        pass
+
+
+def main() -> int:
+    ih = (sys.argv[1] if len(sys.argv) > 1 else "").strip().lower()
+    # qBittorrent 先触发钩子、后落盘 .fastresume 的情况存在，等一下再读
+    time.sleep(1.5)
+    try:
+        stats = core.sync()
+    except Exception as e:  # 钩子里不抛异常，避免影响 qBittorrent
+        log(f"ERROR {ih or '-'} {e}")
+        return 0
+
+    row = core.lookup(ih) if ih else None
+    if row:
+        log(f"OK {ih} {(row['name'] or '')[:80]} new={stats['new']} hit={row['hit_count']}")
+    else:
+        log(f"SKIP {ih or '-'} new={stats['new']} skipped={stats['skipped']} "
+            f"removed={stats['marked_removed']}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

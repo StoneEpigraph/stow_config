@@ -1,0 +1,315 @@
+#!/usr/bin/env python3
+"""qbhist — qBittorrent 下载历史库。
+
+  qbhist sync                 扫描 BT_backup，并入历史库（可重复执行）
+  qbhist check <magnet|种子|hash>   查这个种子以前下过没有
+  qbhist list [N]             列出历史完成记录
+  qbhist stats                概况
+  qbhist watch [间隔秒]        常驻循环同步，默认 60 秒
+  qbhist enable-magnet        接管磁力链接 / .torrent，添加前弹确认
+  qbhist disable-magnet       取消接管，还原原来的默认程序
+  qbhist hook                 让 qBittorrent 每下完一个种子就自动入库
+  qbhist stop                 停掉常驻同步
+
+退出码：check 命中返回 10，未命中返回 0，参数无法识别返回 2。
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import sys
+import time
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+
+import qbhist_core as core  # noqa: E402
+
+
+def cmd_check(args: list[str]) -> int:
+    if not args:
+        print("用法：qbhist check <磁力链接 | .torrent 文件 | info_hash>", file=sys.stderr)
+        return 2
+    target = " ".join(args)
+    ih, kind = core.resolve_input(target)
+    if not ih:
+        print(f"× {kind}", file=sys.stderr)
+        return 2
+    row = core.lookup(ih)
+    if not row:
+        print(f"✓ 没有下载记录（{kind}）\n  hash {ih}")
+        return 0
+    print("⚠ 这个种子以前下载过\n")
+    print(core.render_row(row))
+    if not row["is_complete"]:
+        print("\n  注意：上次也没有下载完成。")
+    return 10
+
+
+def cmd_list(args: list[str]) -> int:
+    limit = int(args[0]) if args and args[0].isdigit() else 30
+    conn = core.connect()
+    rows = conn.execute(
+        "SELECT * FROM torrents WHERE completed_time>0 OR is_complete=1 "
+        "ORDER BY completed_time DESC, last_seen DESC LIMIT ?", (limit,)).fetchall()
+    total = conn.execute("SELECT COUNT(*) c FROM torrents").fetchone()["c"]
+    conn.close()
+    if not rows:
+        print("历史库还是空的，先跑一次 qbhist sync")
+        return 0
+    print(f"最近 {len(rows)} 条已完成记录（库内共 {total} 条）\n")
+    for r in rows:
+        mark = " " if r["present"] else "×"
+        print(f"{mark} {core.fmt_time(r['completed_time'] or r['last_seen'])}  "
+              f"{core.human_size(r['total_size']):>10}  {r['name'][:70]}")
+    print("\n（× = 已从 qBittorrent 移除，但记录保留）")
+    return 0
+
+
+def cmd_stats(_args: list[str]) -> int:
+    conn = core.connect()
+    q = conn.execute("""SELECT
+        COUNT(*) total,
+        SUM(CASE WHEN present=1 THEN 1 ELSE 0 END) present,
+        SUM(CASE WHEN present=0 THEN 1 ELSE 0 END) removed,
+        SUM(CASE WHEN is_complete=1 THEN 1 ELSE 0 END) complete,
+        SUM(CASE WHEN hit_count>1 THEN 1 ELSE 0 END) repeated,
+        SUM(total_size) bytes
+        FROM torrents""").fetchone()
+    last = conn.execute("SELECT MAX(last_seen) t FROM torrents").fetchone()["t"]
+    last_event = conn.execute("SELECT MAX(seen_at) t FROM sightings").fetchone()["t"]
+    conn.close()
+    print(f"历史库   {core.db_path()}")
+    print(f"种子目录 {core.bt_backup_dir()}")
+    print(f"记录总数 {q['total'] or 0}")
+    print(f"  仍在列表   {q['present'] or 0}")
+    print(f"  已移除     {q['removed'] or 0}")
+    print(f"  已完成     {q['complete'] or 0}")
+    print(f"  下过多次   {q['repeated'] or 0}")
+    print(f"累计体积 {core.human_size(q['bytes'] or 0)}")
+    print(f"最后同步 {core.fmt_time(last) if last else '从未'}")
+    print(f"最后事件 {core.fmt_time(last_event) + '（' + core.human_ago(last_event) + '）' if last_event else '无'}")
+    return 0
+
+
+def cmd_watch(args: list[str]) -> int:
+    """常驻同步。自启动时没有终端，输出写日志，并且只允许一个实例。"""
+    interval = int(args[0]) if args and args[0].isdigit() else 60
+    data = core.home() / ".local/share/qb-history"
+    data.mkdir(parents=True, exist_ok=True)
+    lock = data / "watch.pid"
+
+    if lock.exists():
+        try:
+            pid = int(lock.read_text().strip())
+            os.kill(pid, 0)
+            print(f"已经有 watch 在跑（PID {pid}），不重复启动")
+            return 0
+        except (ValueError, OSError):
+            pass
+    lock.write_text(str(os.getpid()))
+
+    logf = (data / "watch.log").open("a", encoding="utf-8", buffering=1)
+
+    def say(msg: str) -> None:
+        line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}"
+        print(line, flush=True)
+        try:
+            logf.write(line + "\n")
+        except Exception:
+            pass
+
+    def cleanup() -> None:
+        try:
+            if lock.exists() and lock.read_text().strip() == str(os.getpid()):
+                lock.unlink()
+        except Exception:
+            pass
+
+    import atexit
+    atexit.register(cleanup)
+    say(f"=== 启动，每 {interval} 秒同步一次（PID {os.getpid()}）===")
+
+    try:
+        while True:
+            try:
+                s = core.sync()
+                if s["new"] or s["marked_removed"]:
+                    say(f"完成入库 {s['new']} · 标记移除 {s['marked_removed']} "
+                        f"· 跳过未完成 {s['skipped']}")
+            except Exception as e:
+                say(f"同步出错：{e}")
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        say("=== 退出 ===")
+        return 0
+
+
+# ------------------------------------------------------------ 磁力链接接管
+
+DESKTOP_ID = "qbadd-magnet.desktop"
+STATE_DIR = core.home() / ".config/qbittorrent-history"
+MIMES = ("x-scheme-handler/magnet", "application/x-bittorrent")
+
+
+def _desktop_file() -> "os.PathLike[str]":
+    return core.home() / ".local/share/applications" / DESKTOP_ID
+
+
+def _current_default(mime: str) -> str:
+    try:
+        r = subprocess.run(["xdg-mime", "query", "default", mime],
+                           capture_output=True, text=True)
+        return r.stdout.strip()
+    except Exception:
+        return ""
+
+
+def cmd_enable_magnet(_args: list[str]) -> int:
+    exe = core.home() / ".local/bin/qbadd"
+    if not exe.exists():
+        print(f"× 找不到 {exe}", file=sys.stderr)
+        return 2
+    df = _desktop_file()
+    df.parent.mkdir(parents=True, exist_ok=True)
+    prev = {m: _current_default(m) for m in MIMES}
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    (STATE_DIR / "magnet-previous.json").write_text(
+        __import__("json").dumps(prev, ensure_ascii=False, indent=2), encoding="utf-8")
+    df.write_text(
+        "[Desktop Entry]\n"
+        "Type=Application\n"
+        "Name=qBittorrent（历史检查）\n"
+        "Comment=添加前检查是否下载过，避免重复下载\n"
+        f"Exec={exe} %u\n"
+        "MimeType=x-scheme-handler/magnet;application/x-bittorrent;\n"
+        "Terminal=false\n"
+        "NoDisplay=true\n"
+        "Categories=Network;\n",
+        encoding="utf-8")
+    for m in MIMES:
+        subprocess.run(["xdg-mime", "default", DESKTOP_ID, m], check=False)
+    print("✓ 已接管磁力链接与 .torrent 文件")
+    for m in MIMES:
+        print(f"  {m} -> {_current_default(m)}")
+    print("\n浏览器下次点磁力链接会先问你。想还原：qbhist disable-magnet")
+    return 0
+
+
+def cmd_stop(_args: list[str]) -> int:
+    lock = core.home() / ".local/share/qb-history/watch.pid"
+    if not lock.exists():
+        print("没有正在运行的 watch")
+        return 0
+    try:
+        pid = int(lock.read_text().strip())
+        import signal
+        os.kill(pid, signal.SIGTERM)
+        print(f"已停止 watch（PID {pid}）")
+    except ProcessLookupError:
+        print("进程已经不在了，清理残留锁")
+    except ValueError:
+        pass
+    lock.unlink(missing_ok=True)
+    return 0
+
+
+def cmd_hook(_args: list[str]) -> int:
+    """把"下载完成时运行外部程序"写进 qBittorrent 配置。"""
+    conf = core.home() / ".config/qBittorrent/qBittorrent.conf"
+    hook = core.home() / ".local/bin/qbhist-on-finish"
+    if not hook.exists():
+        print(f"× 找不到 {hook}", file=sys.stderr)
+        return 2
+    if not conf.exists():
+        print(f"× 找不到 {conf}", file=sys.stderr)
+        return 2
+
+    text = conf.read_text(encoding="utf-8", errors="replace")
+    if "OnTorrentFinished\\Enabled" in text and "OnTorrentFinished\\Program" in text:
+        print("✓ 完成钩子已经配置过：")
+        for line in text.splitlines():
+            if "OnTorrentFinished" in line or "OnTorrentAdded" in line:
+                print(f"  {line}")
+        print("\n若没生效，退出 qBittorrent 后重跑一次本命令。")
+        return 0
+
+    # qBittorrent 退出时会把内存里的设置整份写回，运行中改文件会被覆盖
+    if core.qbittorrent_running():
+        print("✗ qBittorrent 正在运行 —— 现在改配置文件，它退出时会把改动整份覆盖掉，等于白改。\n")
+        print("两个办法，任选其一：")
+        print("  1) 退出 qBittorrent，然后重跑：qbhist hook")
+        print("  2) 直接在界面里设，立即生效：")
+        print("     设置 → 下载 → 勾选 Run external program on torrent finished")
+        print(f"     命令填：{hook} %I")
+        return 1
+
+    bak = conf.with_name("qBittorrent.conf.bak-qbhist")
+    shutil.copy2(conf, bak)
+    block = (
+        "\n[AutoRun]\n"
+        "OnTorrentAdded\\Enabled=false\n"
+        "OnTorrentFinished\\Enabled=true\n"
+        f"OnTorrentFinished\\Program={hook} %I\n"
+    )
+    with conf.open("a", encoding="utf-8") as f:
+        f.write(block)
+
+    print(f"✓ 已写入【下载完成时运行】钩子（备份 {bak}）")
+    print(f"  程序：{hook} %I")
+    print("\n启动 qBittorrent 后生效，之后每下完一个种子就自动入库，在下载的不会被记。")
+    return 0
+
+
+def cmd_disable_magnet(_args: list[str]) -> int:
+    import json
+    prev_file = STATE_DIR / "magnet-previous.json"
+    prev = {}
+    if prev_file.exists():
+        try:
+            prev = json.loads(prev_file.read_text(encoding="utf-8"))
+        except Exception:
+            prev = {}
+    for m in MIMES:
+        back = prev.get(m) or ""
+        if back and back != DESKTOP_ID:
+            subprocess.run(["xdg-mime", "default", back, m], check=False)
+            print(f"  还原 {m} -> {back}")
+        else:
+            subprocess.run(["xdg-mime", "default", "org.qbittorrent.qBittorrent.desktop", m],
+                           check=False)
+            print(f"  还原 {m} -> org.qbittorrent.qBittorrent.desktop")
+    df = _desktop_file()
+    if df.exists():
+        df.unlink()
+    print("✓ 已取消接管")
+    return 0
+
+
+def main() -> int:
+    if len(sys.argv) < 2:
+        print(__doc__.strip())
+        return 0
+    cmd, rest = sys.argv[1], sys.argv[2:]
+    table = {
+        "sync": lambda a: (core.sync(verbose=True), 0)[1],
+        "check": cmd_check,
+        "list": cmd_list,
+        "ls": cmd_list,
+        "stats": cmd_stats,
+        "watch": cmd_watch,
+        "enable-magnet": cmd_enable_magnet,
+        "disable-magnet": cmd_disable_magnet,
+        "hook": cmd_hook,
+        "stop": cmd_stop,
+    }
+    fn = table.get(cmd)
+    if not fn:
+        print(f"未知子命令：{cmd}\n\n{__doc__.strip()}", file=sys.stderr)
+        return 2
+    return fn(rest)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

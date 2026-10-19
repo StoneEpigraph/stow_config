@@ -28,7 +28,7 @@ TARGET="${HOME}"
 
 PACKAGES=(
   agents cargo dunst emacs fastfetch fcitx5 ghostty gitui kanata
-  mvnvm ncmpcpp ripgrep vim workbuddy zed zsh
+  mvnvm ncmpcpp qbittorrent-history ripgrep vim workbuddy zed zsh
 )
 
 # 目标若还是「实体文件」就需要先备份让位（相对 $HOME）

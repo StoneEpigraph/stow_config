@@ -95,26 +95,38 @@ def cmd_stats(_args: list[str]) -> int:
 
 def cmd_watch(args: list[str]) -> int:
     """常驻同步。自启动时没有终端，输出写日志，并且只允许一个实例。"""
+    import atexit
+    import fcntl
+
     interval = int(args[0]) if args and args[0].isdigit() else 60
     data = core.home() / ".local/share/qb-history"
     data.mkdir(parents=True, exist_ok=True)
-    lock = data / "watch.pid"
+    pidf = data / "watch.pid"
 
-    if lock.exists():
+    # 用 flock 做互斥：进程无论怎么退出，内核都会释放锁，
+    # 不会像读 pid 文件那样被 PID 复用骗过去（开机后 PID 2 往往另有其主）。
+    lockf = (data / "watch.lock").open("a+")
+    try:
+        fcntl.flock(lockf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
         try:
-            pid = int(lock.read_text().strip())
-            os.kill(pid, 0)
-            print(f"已经有 watch 在跑（PID {pid}），不重复启动")
-            return 0
-        except (ValueError, OSError):
-            pass
-    lock.write_text(str(os.getpid()))
+            other = pidf.read_text().strip()
+        except Exception:
+            other = "?"
+        print(f"已经有 watch 在跑（PID {other}），不重复启动")
+        lockf.close()
+        return 0
+
+    pidf.write_text(str(os.getpid()))
 
     logf = (data / "watch.log").open("a", encoding="utf-8", buffering=1)
 
     def say(msg: str) -> None:
         line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}"
-        print(line, flush=True)
+        try:                      # 自启动时 stdout 可能不可写，别为此崩掉
+            print(line, flush=True)
+        except Exception:
+            pass
         try:
             logf.write(line + "\n")
         except Exception:
@@ -122,12 +134,11 @@ def cmd_watch(args: list[str]) -> int:
 
     def cleanup() -> None:
         try:
-            if lock.exists() and lock.read_text().strip() == str(os.getpid()):
-                lock.unlink()
+            if pidf.exists() and pidf.read_text().strip() == str(os.getpid()):
+                pidf.unlink()
         except Exception:
             pass
 
-    import atexit
     atexit.register(cleanup)
     say(f"=== 启动，每 {interval} 秒同步一次（PID {os.getpid()}）===")
 
@@ -197,21 +208,58 @@ def cmd_enable_magnet(_args: list[str]) -> int:
     return 0
 
 
+def _is_qbhist_watch(pid: int) -> bool:
+    """确认这个 PID 确实是 watch 进程，避免 PID 被复用后误杀。"""
+    try:
+        cmd = open(f"/proc/{pid}/cmdline", "rb").read()
+    except FileNotFoundError:
+        return False
+    except Exception:
+        return True                 # 看不到 /proc 时宁可放行，交给 kill 自己判断
+    return b"qbhist" in cmd and b"watch" in cmd
+
+
 def cmd_stop(_args: list[str]) -> int:
-    lock = core.home() / ".local/share/qb-history/watch.pid"
-    if not lock.exists():
+    import signal
+
+    data = core.home() / ".local/share/qb-history"
+    pidf = data / "watch.pid"
+    if not pidf.exists():
         print("没有正在运行的 watch")
         return 0
     try:
-        pid = int(lock.read_text().strip())
-        import signal
-        os.kill(pid, signal.SIGTERM)
-        print(f"已停止 watch（PID {pid}）")
-    except ProcessLookupError:
-        print("进程已经不在了，清理残留锁")
+        pid = int(pidf.read_text().strip())
     except ValueError:
-        pass
-    lock.unlink(missing_ok=True)
+        pidf.unlink(missing_ok=True)
+        print("PID 文件不合法，已清理")
+        return 0
+
+    if not _is_qbhist_watch(pid):
+        pidf.unlink(missing_ok=True)
+        print(f"PID {pid} 不是 watch 进程（多半是重启后号码被复用），已清理残留记录")
+        return 0
+
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pidf.unlink(missing_ok=True)
+        print("进程已经不在了，已清理残留记录")
+        return 0
+
+    for _ in range(30):                 # 最多等 3 秒，不行就强杀
+        time.sleep(0.1)
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            break
+    else:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
+
+    pidf.unlink(missing_ok=True)
+    print(f"已停止 watch（PID {pid}）")
     return 0
 
 

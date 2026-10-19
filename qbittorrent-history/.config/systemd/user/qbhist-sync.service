@@ -1,0 +1,14 @@
+[Unit]
+Description=qBittorrent 下载历史同步（只收录已完成的任务）
+Documentation=file:///home/stone/stow_config/README.md
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/qbhist watch 60
+Restart=always
+RestartSec=15
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=default.target

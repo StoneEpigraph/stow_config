@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# 对固定 4 个网址整页截图 + 时间水印，失败时推送到钉钉/企业微信
+# 由 systemd user timer (webcapture.timer) 每 15 分钟调用一次
+#
+# 首次部署：先跑一次 setup.sh 建 venv
+set -uo pipefail
+
+SELF=$(readlink -f "$0")
+BASE=$(dirname "$SELF")
+OUT="$HOME/webcapture"
+VENV_PY="$HOME/.local/share/webcapture-venv/bin/python3"
+
+export TMPDIR="${TMPDIR:-$HOME/.cache/webcapture-tmp}"
+export LANG="${LANG:-zh_CN.UTF-8}"
+mkdir -p "$TMPDIR" "$OUT"
+
+# 找一个真正装了 playwright + pillow 的解释器
+pick_py() {
+  local c
+  for c in "$VENV_PY" \
+           "$HOME/.workbuddy/binaries/python/envs/default/bin/python3" \
+           "/usr/bin/python3"; do
+    [ -x "$c" ] || continue
+    if "$c" -c 'import playwright, PIL' >/dev/null 2>&1; then
+      printf '%s' "$c"
+      return 0
+    fi
+  done
+  return 1
+}
+
+if ! PY=$(pick_py); then
+  echo "[$(date '+%F %T')] 缺少 playwright/pillow，请先运行 $BASE/setup.sh" | tee -a "$OUT/run.out"
+  exit 3
+fi
+
+# 同一时间只跑一个实例，避免上一次还没结束就叠加
+exec 9>"$OUT/.lock"
+flock -n 9 || { echo "[$(date '+%F %T')] 已有实例在跑，跳过本轮" >> "$OUT/run.out"; exit 0; }
+
+echo "[$(date '+%F %T')] ---- run start ($PY) ----" >> "$OUT/run.out"
+"$PY" -u "$BASE/capture.py" >> "$OUT/run.out" 2>&1
+rc=$?
+
+# 保留策略：RETENTION_DAYS>0 时清理过期截图（默认关闭）
+RETENTION_DAYS=0
+if [ "$RETENTION_DAYS" -gt 0 ]; then
+  find "$OUT" -type f -name '*.png' -mtime +"$RETENTION_DAYS" -delete
+fi
+
+exit $rc

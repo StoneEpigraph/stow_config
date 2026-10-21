@@ -1,0 +1,10 @@
+[Unit]
+Description=Web page full-page screenshots with time watermark
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/webcapture/shot.sh
+TimeoutStartSec=600
+Nice=10
+IOSchedulingClass=idle

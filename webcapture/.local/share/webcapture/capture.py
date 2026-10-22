@@ -27,6 +27,7 @@ DEFAULT_URLS = [
 ]
 
 OUT_ROOT = os.path.expanduser("~/webcapture")
+RAW_DIR = os.path.expanduser("~/webcapture/state/.raw")
 LOG = os.path.join(OUT_ROOT, "capture.log")
 BROWSER_CANDIDATES = ["/usr/bin/chromium", "/usr/bin/google-chrome-stable"]
 VIEWPORT = {"width": 1440, "height": 900}
@@ -68,8 +69,8 @@ def font(size):
     return ImageFont.load_default()
 
 
-def add_watermark(path, url, ts_text):
-    img = Image.open(path).convert("RGB")
+def add_watermark(src, dst, url, ts_text):
+    img = Image.open(src).convert("RGB")
     w, h = img.size
     overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(overlay)
@@ -108,7 +109,7 @@ def add_watermark(path, url, ts_text):
     d.rectangle([0, 0, int(d.textlength(ts_text, font=head)) + 20, head.size + 12], fill=(0, 0, 0, 140))
     d.text((10, 6), ts_text, font=head, fill=(255, 255, 255, 230))
 
-    Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB").save(path, "PNG", optimize=False)
+    Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB").save(dst, "PNG", optimize=False)
     return w, h
 
 
@@ -139,7 +140,7 @@ def shoot(browser, url):
                 last_err = f"{type(e).__name__}: {str(e).splitlines()[0]}"
                 log(f"RETRY {url} 第{attempt + 1}次失败: {last_err}")
                 if attempt == 1:
-                    return None, 0, 0, last_err
+                    return None, 0, 0, last_err, None
                 RETRIED.append(url)
                 try:
                     page.close()
@@ -166,11 +167,27 @@ def shoot(browser, url):
         except Exception:
             pass
         page.wait_for_timeout(1200)
-        page.screenshot(path=out, full_page=True, animations="disabled", caret="hide")
-        w, hgt = add_watermark(out, url, ts_text)
-        return out, w, hgt, None
+        # 先存裸图（差异对比用裸图，水印每轮都变会污染 diff）
+        raw = os.path.join(RAW_DIR, f".tmp-{host_slug(url)}.png")
+        os.makedirs(RAW_DIR, exist_ok=True)
+        page.screenshot(path=raw, full_page=True, animations="disabled", caret="hide")
+        try:
+            page_text = page.evaluate("document.body.innerText") or ""
+        except Exception:
+            page_text = ""
+
+        w, hgt = add_watermark(raw, out, url, ts_text)
+
+        info = None
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            import compare
+            info = compare.check(host_slug(url), raw, page_text, url)
+        except Exception as e:
+            log(f"COMPARE 跳过 {url}: {e}")
+        return out, w, hgt, None, info
     except Exception as e:
-        return None, 0, 0, f"{type(e).__name__}: {e}"
+        return None, 0, 0, f"{type(e).__name__}: {e}", None
     finally:
         try:
             ctx.close()
@@ -196,6 +213,38 @@ def alert(fails, oks, retried):
         log(f"NOTIFY 发送异常: {e}")
 
 
+def alert_changes(changed, total):
+    """页面内容/外观有变化时推送。"""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import notify
+    except Exception as e:
+        log(f"NOTIFY 模块加载失败: {e}")
+        return
+    ts = f"{datetime.now():%Y-%m-%d %H:%M:%S}"
+    lines = [f"**时间**：{ts}", f"**变更站点**：{len(changed)} / {total}", ""]
+    for info in changed:
+        lines.append(f"**【{info['host']}】**")
+        if info.get("text_changed"):
+            an, rn = info.get("added_n", 0), info.get("removed_n", 0)
+            lines.append(f"文本变更：+{an} 行 / -{rn} 行")
+            for s in info.get("added", []):
+                lines.append(f"> + {s[:120]}")
+            for s in info.get("removed", []):
+                lines.append(f"> - {s[:120]}")
+        if info.get("img_ratio") is not None:
+            lines.append(f"图像变化：{info['img_ratio'] * 100:.2f}%")
+        if info.get("img_diff_path"):
+            lines.append(f"差异图：{info['img_diff_path']}")
+        lines.append("")
+    title = f"🔔 网页内容变更 {len(changed)}/{total}"
+    try:
+        res = notify.send(title, "\n".join(lines))
+        print(f"change alert -> {res}")
+    except Exception as e:
+        log(f"NOTIFY 发送异常: {e}")
+
+
 def main():
     urls = sys.argv[1:] or DEFAULT_URLS
     del RETRIED[:]
@@ -207,6 +256,7 @@ def main():
         return 1
     ok, fail = 0, 0
     fails, oks = [], []
+    changed = []
     with sync_playwright() as p:
         browser = p.chromium.launch(
             executable_path=exe,
@@ -216,12 +266,14 @@ def main():
         )
         try:
             for url in urls:
-                out, w, hgt, err = shoot(browser, url)
+                out, w, hgt, err, info = shoot(browser, url)
                 if out:
                     ok += 1
                     oks.append(host_slug(url))
                     print(f"OK   {url}  ->  {out}  ({w}x{hgt})")
                     log(f"OK {url} -> {out} {w}x{hgt}")
+                    if info:
+                        _report_change(url, info, changed)
                 else:
                     fail += 1
                     fails.append((url, err or "未知错误"))
@@ -229,10 +281,38 @@ def main():
                     log(f"FAIL {url} {err}")
         finally:
             browser.close()
-    print(f"done ok={ok} fail={fail}")
+    print(f"done ok={ok} fail={fail} changed={len(changed)}")
     if fails:
         alert(fails, oks, RETRIED)
+    if changed:
+        alert_changes(changed, len(urls))
     return 0 if fail == 0 else 2
+
+
+def _report_change(url, info, bucket):
+    """把变化写进日志并按配置决定是否进报警队列。"""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import compare
+    except Exception:
+        return
+    if info.get("baseline"):
+        log(f"BASELINE {url} 已建立基线")
+        return
+    bits = []
+    if info.get("text_changed"):
+        bits.append(f"文本 +{info.get('added_n', 0)}/-{info.get('removed_n', 0)} 行")
+        for s in info.get("added", [])[:3]:
+            bits.append(f"+{s[:80]}")
+        for s in info.get("removed", [])[:3]:
+            bits.append(f"-{s[:80]}")
+    if info.get("img_ratio"):  # 0.0 不算变化，别刷日志
+        bits.append(f"图像 {info['img_ratio'] * 100:.2f}%")
+    if bits:
+        log(f"CHANGE {url} " + "，".join(bits))
+        print(f"CHG  {url}  " + "，".join(bits))
+    if compare.should_alert(info):
+        bucket.append(info)
 
 
 if __name__ == "__main__":

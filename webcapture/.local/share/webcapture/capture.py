@@ -35,6 +35,28 @@ VIEWPORT = {"width": 1440, "height": 900}
 # 本轮「第一次失败但重试后成功」的 URL，用于报警文案
 RETRIED = []
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import health  # noqa: E402  站点健康状态（连续失败计数 / 恢复判定）
+
+DEFAULT_FAIL_INTERVAL = 3600  # 连续失败时最小提醒间隔（秒），可被 notify.conf 覆盖
+
+
+def notify_conf():
+    """读取 notify.conf（缺失时返回空 dict）。"""
+    try:
+        import notify
+        return notify.load_conf()
+    except Exception:
+        return {}
+
+
+def _conf_int(conf, key, default):
+    try:
+        v = conf.get(key)
+        return default if v in (None, "") else int(float(v))
+    except Exception:
+        return default
+
 
 def log(msg):
     os.makedirs(OUT_ROOT, exist_ok=True)
@@ -196,7 +218,10 @@ def shoot(browser, url):
 
 
 def alert(fails, oks, retried):
-    """本轮有请求失败时推送到钉钉/企业微信；没配置就只写日志。"""
+    """本轮有请求失败时推送到钉钉/企业微信；没配置就只写日志。
+
+    fails 项为 (url, err, state)，state 里带连续失败次数与是否降频静默。
+    """
     try:
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         import notify
@@ -209,6 +234,24 @@ def alert(fails, oks, retried):
     try:
         res = notify.send(title, text)
         print(f"alert -> {res}")
+    except Exception as e:
+        log(f"NOTIFY 发送异常: {e}")
+
+
+def alert_recovered(recovered, total):
+    """站点从失败态恢复时推一条，形成闭环。"""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import notify
+    except Exception as e:
+        log(f"NOTIFY 模块加载失败: {e}")
+        return
+    ts = f"{datetime.now():%Y-%m-%d %H:%M:%S}"
+    title = f"✅ 网页截图已恢复 {len(recovered)}/{total}"
+    text = notify.build_recover_text(ts, recovered, total)
+    try:
+        res = notify.send(title, text)
+        print(f"recover alert -> {res}")
     except Exception as e:
         log(f"NOTIFY 发送异常: {e}")
 
@@ -248,15 +291,30 @@ def alert_changes(changed, total):
 def main():
     urls = sys.argv[1:] or DEFAULT_URLS
     del RETRIED[:]
+    conf = notify_conf()
+    fail_interval = _conf_int(conf, "FAIL_ALERT_INTERVAL", DEFAULT_FAIL_INTERVAL)
+    recover_on = _conf_int(conf, "ALERT_ON_RECOVER", 1)
+
     exe = find_browser()
     if not exe:
         log("ERROR 找不到 chromium/chrome")
         print("找不到浏览器", file=sys.stderr)
-        alert([("(启动失败)", "找不到 chromium/chrome")], [], [])
+        try:
+            st = health.on_fail("__browser__", "找不到 chromium/chrome", fail_interval)
+        except Exception:
+            st = {"action": "alert", "fail_count": 1}
+        if st.get("action") == "alert":
+            alert([("(启动失败)", "找不到 chromium/chrome", st)], [], [])
         return 1
+    try:
+        if health.load("__browser__").get("fail_count"):
+            health.save("__browser__", {"fail_count": 0})
+    except Exception:
+        pass
+
     ok, fail = 0, 0
     fails, oks = [], []
-    changed = []
+    changed, recovered = [], []
     with sync_playwright() as p:
         browser = p.chromium.launch(
             executable_path=exe,
@@ -266,26 +324,50 @@ def main():
         )
         try:
             for url in urls:
+                slug = host_slug(url)
                 out, w, hgt, err, info = shoot(browser, url)
                 if out:
                     ok += 1
-                    oks.append(host_slug(url))
+                    oks.append(slug)
                     print(f"OK   {url}  ->  {out}  ({w}x{hgt})")
                     log(f"OK {url} -> {out} {w}x{hgt}")
+                    try:
+                        rec = health.on_ok(slug)
+                    except Exception as e:
+                        rec = None
+                        log(f"HEALTH 写状态失败 {slug}: {e}")
+                    if rec:
+                        rec["url"] = url
+                        recovered.append(rec)
+                        log(f"RECOVER {url} 连续失败 {rec['fail_count']} 次后恢复，"
+                            f"中断 {health.fmt_dur(rec['seconds'])}")
                     if info:
                         _report_change(url, info, changed)
                 else:
                     fail += 1
-                    fails.append((url, err or "未知错误"))
-                    print(f"FAIL {url}  {err}")
-                    log(f"FAIL {url} {err}")
+                    try:
+                        st = health.on_fail(slug, err or "未知错误", fail_interval)
+                    except Exception as e:
+                        st = {"action": "alert", "fail_count": 1, "seconds": 0}
+                        log(f"HEALTH 写状态失败 {slug}: {e}")
+                    st["url"] = url
+                    fails.append((url, err or "未知错误", st))
+                    state_txt = ("已报警" if st.get("action") == "alert" else "降频静默")
+                    print(f"FAIL {url}  {err}  [连续第 {st.get('fail_count', 1)} 次 / {state_txt}]")
+                    log(f"FAIL {url} {err} | 连续第 {st.get('fail_count', 1)} 次 | {state_txt}")
         finally:
             browser.close()
-    print(f"done ok={ok} fail={fail} changed={len(changed)}")
-    if fails:
+    print(f"done ok={ok} fail={fail} changed={len(changed)} recovered={len(recovered)}")
+
+    if any(len(f) >= 3 and f[2].get("action") == "alert" for f in fails):
         alert(fails, oks, RETRIED)
     if changed:
         alert_changes(changed, len(urls))
+    if recovered:
+        if recover_on:
+            alert_recovered(recovered, len(urls))
+        else:
+            log(f"RECOVER 共 {len(recovered)} 站恢复，但 ALERT_ON_RECOVER=0，不发送")
     return 0 if fail == 0 else 2
 
 

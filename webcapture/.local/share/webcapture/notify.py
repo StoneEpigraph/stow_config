@@ -113,28 +113,109 @@ def send(title, text):
     return results
 
 
+def _fmt_dur(sec):
+    sec = int(max(0, sec))
+    d, rem = divmod(sec, 86400)
+    hh, rem = divmod(rem, 3600)
+    mm, ss = divmod(rem, 60)
+    if d:
+        return f"{d}天{hh}小时{mm}分"
+    if hh:
+        return f"{hh}小时{mm}分"
+    if mm:
+        return f"{mm}分{ss}秒"
+    return f"{ss}秒"
+
+
+def _unpack(item):
+    """失败项支持 (url, err) 与 (url, err, state) 两种形式。"""
+    if len(item) >= 3:
+        return item[0], item[1], item[2] or {}
+    return item[0], item[1], {}
+
+
 def build_fail_text(ts, fails, oks, retried):
-    lines = [f"**时间**：{ts}", f"**结果**：失败 {len(fails)} / 共 {len(fails) + len(oks)}",
+    n_silent = sum(1 for f in fails if _unpack(f)[2].get("action") == "silent")
+    only_one = n_silent == 0 and len(fails) == 1
+
+    lines = [f"**时间**：{ts}",
+             f"**结果**：失败 {len(fails)} / 共 {len(fails) + len(oks)}",
              ""]
-    for url, err in fails:
+    for item in fails:
+        url, err, st = _unpack(item)
         lines.append(f"- ❌ {url}")
         lines.append(f"  {err}")
+        n = int(st.get("fail_count", 0) or 0)
+        if n > 1:
+            dur = _fmt_dur(st.get("seconds", 0))
+            since = st.get("first_fail_at", "")
+            lines.append(f"  连续失败第 {n} 次，已持续 {dur}"
+                         + (f"（首次 {since}）" if since else ""))
+        elif n == 1:
+            lines.append("  首次失败")
+        if st.get("action") == "silent":
+            nxt = _fmt_dur(st.get("next_alert_in", 0))
+            lines.append(f"  （本条为降频静默，约 {nxt} 后再提醒）")
     if oks:
         lines.append("")
         lines.append("**已成功**：" + "、".join(oks))
     if retried:
         lines.append("")
         lines.append("**重试后成功**：" + "、".join(retried))
+    if n_silent:
+        lines.append("")
+        lines.append(f"**降频中**：{n_silent} 个站点本轮未重复提醒，持续失败会按间隔再报。")
+    if only_one and not oks:
+        lines.append("")
+        lines.append("> 全部站点均失败，可能是网络或浏览器问题，建议先看 capture.log。")
+    return "\n".join(lines)
+
+
+def build_recover_text(ts, recovered, total):
+    lines = [f"**时间**：{ts}", f"**已恢复**：{len(recovered)} / {total}", ""]
+    for info in recovered:
+        url = info.get("url") or info.get("host", "")
+        lines.append(f"- ✅ {url}")
+        n = int(info.get("fail_count", 0) or 0)
+        dur = _fmt_dur(info.get("seconds", 0))
+        lines.append(f"  连续失败 {n} 次后恢复，中断 {dur}")
+        err = (info.get("last_error") or "").strip()
+        if err:
+            lines.append(f"  最后错误：{err[:160]}")
+    lines.append("")
+    lines.append("截图已恢复正常，后续按 15 分钟继续。")
     return "\n".join(lines)
 
 
 def main():
     if "--preview" in sys.argv:
-        print("=== 失败报警（示例）===")
-        print(build_fail_text("2026-10-22 10:15:03",
-                              [("https://www.bjyouth.gov.cn/",
-                                "TimeoutError: Page.goto: Timeout 60000ms exceeded.")],
-                              ["www.bjjdzx.com", "www.bjydf.cn"], ["www.bjjdzx.com"]))
+        print("=== 失败报警（示例：首次失败 + 一个降频静默）===")
+        print(build_fail_text(
+            "2026-10-22 10:15:03",
+            [("https://www.bjyouth.gov.cn/",
+              "TimeoutError: Page.goto: Timeout 60000ms exceeded.",
+              {"action": "alert", "fail_count": 1, "seconds": 0}),
+             ("https://www.bjydf.cn/",
+              "TimeoutError: Page.goto: Timeout 60000ms exceeded.",
+              {"action": "silent", "fail_count": 5, "seconds": 4020,
+               "first_fail_at": "2026-10-22 09:08:11", "next_alert_in": 2880})],
+            ["www.bjjdzx.com"], ["www.juanzhuzhongxin.cn"]))
+        print()
+        print("=== 续报（示例：连续失败第 3 次）===")
+        print(build_fail_text(
+            "2026-10-22 11:15:03",
+            [("https://www.bjyouth.gov.cn/",
+              "TimeoutError: Page.goto: Timeout 60000ms exceeded.",
+              {"action": "alert", "fail_count": 3, "seconds": 3600,
+               "first_fail_at": "2026-10-22 10:15:01"})],
+            ["www.bjjdzx.com", "www.bjydf.cn", "www.juanzhuzhongxin.cn"], []))
+        print()
+        print("=== 恢复报警（示例）===")
+        print(build_recover_text("2026-10-22 11:30:05", [{
+            "url": "https://www.bjyouth.gov.cn/", "host": "www.bjyouth.gov.cn",
+            "fail_count": 3, "seconds": 4500,
+            "last_error": "TimeoutError: Page.goto: Timeout 60000ms exceeded.",
+        }], 4))
         print()
         print("=== 变更报警（示例）===")
         print("**时间**：2026-10-22 10:15:03\n**变更站点**：1 / 4\n\n"
@@ -146,6 +227,8 @@ def main():
               f"（加签{'有' if conf.get('DINGTALK_SECRET') else '无'}，"
               f"关键词 {conf.get('DINGTALK_KEYWORD') or '无'}）\n"
               f"企业微信：{'已配置' if conf.get('WECOM_WEBHOOK') else '未配置'}\n"
+              f"失败降频：连续失败时每 {conf.get('FAIL_ALERT_INTERVAL') or '3600'} 秒最多一条\n"
+              f"恢复通知：{'开' if (conf.get('ALERT_ON_RECOVER') or '1') != '0' else '关'}\n"
               f"配置文件：{CONF}")
         return 0
     if "--test" in sys.argv:

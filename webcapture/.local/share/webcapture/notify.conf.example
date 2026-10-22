@@ -15,3 +15,10 @@ DINGTALK_KEYWORD=
 # 群设置 → 群机器人 → 添加 → 复制 Webhook
 # 形如：https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxxxxxxx
 WECOM_WEBHOOK=
+
+# ── 失败降频 / 恢复通知 ──────────────────────────────────────
+# 同一站点连续失败时，两次提醒的最小间隔（秒）。0 = 每次失败都报。
+# 首次失败一定报；之后按这个间隔续报，避免一天刷 96 条。
+FAIL_ALERT_INTERVAL=3600
+# 站点从失败恢复正常时是否发一条恢复通知（1 开 / 0 关），形成闭环
+ALERT_ON_RECOVER=1

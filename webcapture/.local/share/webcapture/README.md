@@ -1,6 +1,7 @@
-# webcapture —— 网页定时整页截图 + 时间水印 + 失败报警
+# webcapture —— 网页定时整页截图 + 时间水印 + 失败报警 + 恢复通知
 
-每 15 分钟对固定几个网址整页截图，图上打时间水印；任一请求最终失败就推送到钉钉/企业微信群机器人。
+每 15 分钟对固定几个网址整页截图，图上打时间水印；请求失败推送到钉钉/企业微信群机器人，
+站点恢复正常时再推一条「已恢复」，形成闭环。
 
 ## 部署到新机器
 
@@ -45,6 +46,29 @@ python3 ~/.local/share/webcapture/notify.py --test      # 真发一条
 
 企业微信 markdown 单条上限 4096 字节，`notify.py` 会自动截断并提示去看 `capture.log`。
 
+## 报警策略（health.py）
+
+状态存在 `~/webcapture/state/<host>.health.json`，只做三件事：
+
+| 场景 | 行为 |
+|---|---|
+| 首次失败 | 立刻报警，标题「⚠️ 网页截图失败 n/4」 |
+| 持续失败 | 默认每 **1 小时**续报一次，其余轮次静默（详情仍写日志） |
+| 恢复正常 | 推一条「✅ 网页截图已恢复 n/4」，含连续失败次数与中断时长 |
+
+**为什么要降频**：站点真挂了是每 15 分钟一轮，不降频一天就是 96 条同一句话。
+现在一次故障长这样：`09:15 失败` → 静默 → `10:15 续报` → 静默 → `11:00 恢复`，共 3 条。
+
+配置在 `~/webcapture/notify.conf`：
+
+| 键 | 默认 | 含义 |
+|---|---|---|
+| `FAIL_ALERT_INTERVAL` | 3600 | 连续失败时两条提醒的最小间隔（秒），0 = 每次都报 |
+| `ALERT_ON_RECOVER` | 1 | 是否发恢复通知 |
+
+恢复判定是**按站点**的：只要该站点下一轮成功且此前 `fail_count>0`，就发一次并清零。
+手动单跑某个 URL 也会参与这个状态（和定时轮完全一致，便于排障）。
+
 ## 文件
 
 | 路径 | 作用 |
@@ -53,6 +77,7 @@ python3 ~/.local/share/webcapture/notify.py --test      # 真发一条
 | `.local/share/webcapture/compare.py` | 变更检测：文本哈希 + 整页图差异 |
 | `.local/share/webcapture/shot.sh` | 入口：找解释器、flock 防重叠、日志、清理 |
 | `.local/share/webcapture/notify.py` | 钉钉/企业微信 webhook 报警 |
+| `.local/share/webcapture/health.py` | 站点健康状态：连续失败计数、降频、恢复判定 |
 | `.local/share/webcapture/setup.sh` | 一次性环境准备 |
 | `.config/systemd/user/webcapture.*` | 每 15 分钟的 user timer |
 
@@ -89,6 +114,7 @@ python3 ~/.local/share/webcapture/notify.py --test      # 真发一条
 ```
 ~/webcapture/<域名>/<YYYY-MM-DD>/<HHMMSS>.png     # 成品（带水印）
 ~/webcapture/state/<域名>.{json,txt,prev.png}      # 基线：哈希 / 上轮文本 / 上轮裸图
+~/webcapture/state/<域名>.health.json              # 连续失败计数（fail_count=0 即正常）
 ~/webcapture/diffs/<域名>/<时间>.png               # 红框标出变化的差异图
 ~/webcapture/capture.log     # 每条结果即时写，排障先看这个
 ~/webcapture/run.out         # 每轮汇总

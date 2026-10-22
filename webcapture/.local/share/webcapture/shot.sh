@@ -38,12 +38,30 @@ fi
 exec 9>"$OUT/.lock"
 flock -n 9 || { echo "[$(date '+%F %T')] 已有实例在跑，跳过本轮" >> "$OUT/run.out"; exit 0; }
 
+# 等网络就绪（最多 60 秒）。user 实例里 After=network-online.target 是空实现，
+# 开机/重启后立即补跑的那一轮常常还没连上网，容易一起超时误报。
+wait_network() {
+  local i
+  for i in $(seq 1 20); do
+    if command -v nmcli >/dev/null 2>&1; then
+      [ "$(nmcli -t -f STATE general 2>/dev/null)" = "connected" ] && return 0
+    elif command -v curl >/dev/null 2>&1; then
+      curl -s -o /dev/null --max-time 3 http://www.gstatic.com/generate_204 2>/dev/null && return 0
+    else
+      ip route 2>/dev/null | grep -q '^default' && return 0
+    fi
+    sleep 3
+  done
+  return 0   # 等不到也继续，交给 capture.py 自己的重试
+}
+wait_network
+
 echo "[$(date '+%F %T')] ---- run start ($PY) ----" >> "$OUT/run.out"
 "$PY" -u "$BASE/capture.py" >> "$OUT/run.out" 2>&1
 rc=$?
 
-# 保留策略：RETENTION_DAYS>0 时清理过期截图（默认关闭）
-RETENTION_DAYS=0
+# 保留策略：RETENTION_DAYS>0 时清理过期截图（默认关闭，可用环境变量覆盖）
+RETENTION_DAYS="${RETENTION_DAYS:-0}"
 if [ "$RETENTION_DAYS" -gt 0 ]; then
   find "$OUT" -type f -name '*.png' -mtime +"$RETENTION_DAYS" -delete
 fi

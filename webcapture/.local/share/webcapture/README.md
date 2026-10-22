@@ -69,6 +69,33 @@ python3 ~/.local/share/webcapture/notify.py --test      # 真发一条
 恢复判定是**按站点**的：只要该站点下一轮成功且此前 `fail_count>0`，就发一次并清零。
 手动单跑某个 URL 也会参与这个状态（和定时轮完全一致，便于排障）。
 
+## 开机 / 重启后的行为
+
+`webcapture.timer` 是 **systemd user timer**，归属于你的用户会话，所以：
+
+| 情况 | 会不会跑 |
+|---|---|
+| 重启后登录了桌面（或 ssh 登录） | ✅ 自动恢复，无需任何操作 |
+| 重启后停在登录界面没登录 | ❌ 不跑 |
+| 开了 linger（`loginctl enable-linger`） | ✅ 开机即跑，无需登录 |
+| 休眠 / 挂起期间 | ❌ 不跑；唤醒后 `Persistent=true` 会补跑一次 |
+
+`webcapture.timer` 设了 `Persistent=true`，时间戳在
+`~/.local/share/systemd/timers/stamp-webcapture.timer`；错过的触发点在会话起来后补跑一轮。
+
+**想让它在不登录的情况下也跑，开 linger（需要 sudo，一次即可）：**
+
+```bash
+sudo loginctl enable-linger stone
+loginctl show-user stone | grep Linger     # 应显示 Linger=yes
+```
+
+代价是用户级 systemd 常驻，多占二三十兆内存；图形登录后用的是同一个 manager，不冲突。
+
+`shot.sh` 在开跑前会等网络就绪（`nmcli` 判断，最多 60 秒），因为 user 实例里的
+`After=network-online.target` 是空实现——开机补跑的那一轮往往还没连上网，
+不等就会四条一起超时误报。
+
 ## 文件
 
 | 路径 | 作用 |
@@ -130,4 +157,8 @@ python3 ~/.local/share/webcapture/notify.py --test      # 真发一条
   指到 `~/.cache/webcapture-tmp`，Chromium 也带 `--disable-dev-shm-usage`。
 - 不给 Playwright 下载自带 Chromium，直接用系统 `chromium`/`google-chrome-stable`。
 - 水印用中灰+浅描边，纯白字在白底页面会看不见。
-- 磁盘占用约 300–500MB/天；要自动清理就在 `shot.sh` 里把 `RETENTION_DAYS` 改成 7。
+- 磁盘占用约 300–500MB/天；要自动清理就把环境变量 `RETENTION_DAYS=7` 传进去（默认 0 = 不删）。
+  用 systemd 的话在 `webcapture.service` 里加 `Environment=RETENTION_DAYS=7`。
+- 依赖装在 `~/.local/share/webcapture-venv`（`setup.sh` 建的独立 venv），**不要依赖
+  `~/.workbuddy/binaries/python/...`** —— 那是 WorkBuddy 自己的运行时，升级时可能被清掉。
+  `shot.sh` 的探测顺序：独立 venv → WorkBuddy venv → `/usr/bin/python3`，逐个验证能否 import。

@@ -16,6 +16,35 @@ systemctl --user list-timers webcapture.timer
 `notify.conf` 不在仓库里（含密钥），放在 `~/webcapture/notify.conf`，需要报警就按
 `notify.conf.example` 填 webhook，然后 `python3 ~/.local/share/webcapture/notify.py --test`。
 
+## 报警怎么配
+
+只用群机器人 Webhook，不依赖任何客户端在线。
+
+**钉钉**（推荐，个人账号就能用）
+1. 建一个群（比如只有自己的「监控告警」群）
+2. 群设置 → 机器人 → 添加机器人 → **自定义**（通过 Webhook 接入）
+3. 安全设置选一个：
+   - **自定义关键词** → 填 `告警`，同时写进 `DINGTALK_KEYWORD=告警`（消息标题会自动带上）
+   - **加签** → 复制 `SEC...` 那串，写进 `DINGTALK_SECRET=`
+   - **IP 地址段** → 把这台机器的出口 IP 加白
+4. 复制 Webhook：`https://oapi.dingtalk.com/robot/send?access_token=xxx` → `DINGTALK_WEBHOOK=`
+
+**企业微信**
+1. 注册一个组织（个人/团队也能注册），拉一个内部群
+2. 群 → 右上角 `...` → 群机器人 → 添加 → 新创建一个
+3. 复制 Webhook：`https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx` → `WECOM_WEBHOOK=`
+4. 企业微信机器人没有加签，`WECOM_SECRET` 不存在，只靠 URL 里的 key
+
+> 个人微信**没有**官方机器人接口，只能走企业微信这条线。
+
+**验证**
+```bash
+python3 ~/.local/share/webcapture/notify.py --preview   # 看文案长什么样、当前是否已配置
+python3 ~/.local/share/webcapture/notify.py --test      # 真发一条
+```
+
+企业微信 markdown 单条上限 4096 字节，`notify.py` 会自动截断并提示去看 `capture.log`。
+
 ## 文件
 
 | 路径 | 作用 |

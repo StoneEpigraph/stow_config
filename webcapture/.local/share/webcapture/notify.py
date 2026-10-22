@@ -59,6 +59,15 @@ def post_json(url, payload, timeout=12):
     return (code == 0), body[:300]
 
 
+def _clamp(text, limit_bytes):
+    """按字节截断（企业微信 markdown 单条上限 4096 字节）。"""
+    b = text.encode("utf-8")
+    if len(b) <= limit_bytes:
+        return text
+    tail = "\n\n…（内容过长已截断，完整信息见 ~/webcapture/capture.log）"
+    return b[:max(0, limit_bytes - len(tail.encode()))].decode("utf-8", "ignore") + tail
+
+
 def send_dingtalk(conf, title, text):
     hook = conf.get("DINGTALK_WEBHOOK", "")
     if not hook:
@@ -74,7 +83,8 @@ def send_dingtalk(conf, title, text):
     if kw and kw not in title:
         title = f"{kw} {title}"
     return post_json(hook, {"msgtype": "markdown",
-                            "markdown": {"title": title, "text": text}})
+                            "markdown": {"title": _clamp(title, 60),
+                                         "text": _clamp(text, 18000)}})
 
 
 def send_wecom(conf, title, text):
@@ -82,7 +92,7 @@ def send_wecom(conf, title, text):
     if not hook:
         return None
     return post_json(hook, {"msgtype": "markdown",
-                            "markdown": {"content": f"**{title}**\n{text}"}})
+                            "markdown": {"content": _clamp(f"**{title}**\n{text}", 3800)}})
 
 
 def send(title, text):
@@ -119,6 +129,25 @@ def build_fail_text(ts, fails, oks, retried):
 
 
 def main():
+    if "--preview" in sys.argv:
+        print("=== 失败报警（示例）===")
+        print(build_fail_text("2026-10-22 10:15:03",
+                              [("https://www.bjyouth.gov.cn/",
+                                "TimeoutError: Page.goto: Timeout 60000ms exceeded.")],
+                              ["www.bjjdzx.com", "www.bjydf.cn"], ["www.bjjdzx.com"]))
+        print()
+        print("=== 变更报警（示例）===")
+        print("**时间**：2026-10-22 10:15:03\n**变更站点**：1 / 4\n\n"
+              "**【www.bjjdzx.com】**\n文本变更：+1 行 / -1 行\n"
+              "> + 关于2026年度申报工作的通知\n> - 关于2025年度申报工作的通知\n\n"
+              "图像变化：3.29%\n差异图：~/webcapture/diffs/www.bjjdzx.com/20261022-101503.png")
+        conf = load_conf()
+        print(f"\n=== 当前渠道 ===\n钉钉：{'已配置' if conf.get('DINGTALK_WEBHOOK') else '未配置'}"
+              f"（加签{'有' if conf.get('DINGTALK_SECRET') else '无'}，"
+              f"关键词 {conf.get('DINGTALK_KEYWORD') or '无'}）\n"
+              f"企业微信：{'已配置' if conf.get('WECOM_WEBHOOK') else '未配置'}\n"
+              f"配置文件：{CONF}")
+        return 0
     if "--test" in sys.argv:
         from datetime import datetime
         ts = f"{datetime.now():%Y-%m-%d %H:%M:%S}"

@@ -27,6 +27,8 @@ DEFAULT_URLS = [
 ]
 
 OUT_ROOT = os.path.expanduser("~/webcapture")
+# 成品截图对外发布目录（~/public 已由 Samba 共享，内网可直接看）
+IMG_ROOT = os.path.expanduser("~/public/webcapture")
 RAW_DIR = os.path.expanduser("~/webcapture/state/.raw")
 LOG = os.path.join(OUT_ROOT, "capture.log")
 BROWSER_CANDIDATES = ["/usr/bin/chromium", "/usr/bin/google-chrome-stable"]
@@ -138,7 +140,7 @@ def add_watermark(src, dst, url, ts_text):
 def shoot(browser, url):
     now = datetime.now()
     ts_text = f"{now:%Y-%m-%d %H:%M:%S}"
-    outdir = os.path.join(OUT_ROOT, host_slug(url), f"{now:%Y-%m-%d}")
+    outdir = os.path.join(IMG_ROOT, host_slug(url), f"{now:%Y-%m-%d}")
     os.makedirs(outdir, exist_ok=True)
     out = os.path.join(outdir, f"{now:%H%M%S}.png")
 

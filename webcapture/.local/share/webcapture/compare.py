@@ -17,7 +17,7 @@ from datetime import datetime
 from PIL import Image, ImageChops, ImageDraw
 
 STATE_DIR = os.path.expanduser("~/webcapture/state")
-DIFF_DIR = os.path.expanduser("~/webcapture/diffs")
+DIFF_DIR = os.path.expanduser("~/public/webcapture/_diffs")
 CONF = os.path.expanduser("~/webcapture/compare.conf")
 
 DEFAULT_CONF = {

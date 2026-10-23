@@ -115,7 +115,7 @@ loginctl show-user stone | grep Linger     # 应显示 Linger=yes
 1. **文本哈希（主信号）**：取 JS 执行后的 `body.innerText`，归一化（去零宽字符、折叠空白、
    按 `IGNORE_REGEX` 丢噪声行）后算 sha256。变了就报警，并附上新增/删除的行。
 2. **整页图差异（辅助）**：跟上一轮**打水印前**的裸图逐像素比，输出变化像素占比，
-   并在 `~/webcapture/diffs/<host>/` 生成红框标出变化区域的图。
+   并在 `~/public/webcapture/_diffs/<host>/` 生成红框标出变化区域的图。
 
 为什么不直接比最终截图：**水印每轮都变**，带水印比会导致每张都"全页变化"。所以裸图另存
 在 `~/webcapture/state/<host>.prev.png`（每站只留一张，磁盘有界），比完再打水印出成品。
@@ -138,14 +138,41 @@ loginctl show-user stone | grep Linger     # 应显示 Linger=yes
 
 ## 产物
 
+成品截图直接落在 `~/public/webcapture/`（`~/public` 已由 Samba 共享，内网可直接看），
+状态与日志留在 `~/webcapture/`（不对外）。
+
 ```
-~/webcapture/<域名>/<YYYY-MM-DD>/<HHMMSS>.png     # 成品（带水印）
-~/webcapture/state/<域名>.{json,txt,prev.png}      # 基线：哈希 / 上轮文本 / 上轮裸图
-~/webcapture/state/<域名>.health.json              # 连续失败计数（fail_count=0 即正常）
-~/webcapture/diffs/<域名>/<时间>.png               # 红框标出变化的差异图
+~/public/webcapture/<域名>/<YYYY-MM-DD>/<HHMMSS>.png   # 成品（带水印）
+~/public/webcapture/_diffs/<域名>/<时间>.png            # 红框标出变化的差异图
+~/webcapture/state/<域名>.{json,txt,prev.png}          # 基线：哈希 / 上轮文本 / 上轮裸图
+~/webcapture/state/<域名>.health.json                  # 连续失败计数（fail_count=0 即正常）
 ~/webcapture/capture.log     # 每条结果即时写，排障先看这个
 ~/webcapture/run.out         # 每轮汇总
 ```
+
+### 内网访问（SMB）
+
+`/etc/samba/smb.conf` 里已有 `[public]` 段指向 `/home/stone/public`，匿名只读浏览即可：
+
+```
+Windows      \\10.168.1.152\public\webcapture
+macOS        smb://10.168.1.152/public/webcapture
+Linux        smbclient //10.168.1.152/public -N
+```
+
+IP 现在由 dhcpcd 从路由器获取，**换网络会变**；想固定就用主机名（需 nmbd + WINS）或给路由器配静态租约。
+
+如果想给截图单独开一个**只读**共享（避免匿名写满/误删），在 `smb.conf` 追加：
+
+```ini
+[webcapture]
+   path = /home/stone/public/webcapture
+   public = yes
+   read only = yes
+   browseable = yes
+```
+
+然后 `sudo systemctl restart smb`。注意现有 `[public]` 是 `read only = no`，内网任何人都能删东西。
 
 ## 改网址
 

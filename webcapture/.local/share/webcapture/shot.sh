@@ -7,12 +7,13 @@ set -uo pipefail
 
 SELF=$(readlink -f "$0")
 BASE=$(dirname "$SELF")
-OUT="$HOME/webcapture"
+OUT="$HOME/webcapture"                    # 日志 / 状态 / 基线
+IMG_OUT="$HOME/public/webcapture"         # 成品截图（经 Samba 对内网共享）
 VENV_PY="$HOME/.local/share/webcapture-venv/bin/python3"
 
 export TMPDIR="${TMPDIR:-$HOME/.cache/webcapture-tmp}"
 export LANG="${LANG:-zh_CN.UTF-8}"
-mkdir -p "$TMPDIR" "$OUT"
+mkdir -p "$TMPDIR" "$OUT" "$IMG_OUT"
 
 # 找一个真正装了 playwright + pillow 的解释器
 pick_py() {
@@ -63,7 +64,7 @@ rc=$?
 # 保留策略：RETENTION_DAYS>0 时清理过期截图（默认关闭，可用环境变量覆盖）
 RETENTION_DAYS="${RETENTION_DAYS:-0}"
 if [ "$RETENTION_DAYS" -gt 0 ]; then
-  find "$OUT" -type f -name '*.png' -mtime +"$RETENTION_DAYS" -delete
+  find "$OUT" "$IMG_OUT" -type f -name '*.png' -mtime +"$RETENTION_DAYS" -delete 2>/dev/null
 fi
 
 exit $rc

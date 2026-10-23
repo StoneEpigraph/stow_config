@@ -13,6 +13,7 @@ import sys
 import os
 import re
 import time
+import shutil
 import traceback
 from datetime import datetime
 
@@ -219,6 +220,53 @@ def shoot(browser, url):
             pass
 
 
+def update_latest(url, out):
+    """给每站最新成品图建一个固定文件名的硬链接，供内网直接查看。
+
+    用硬链接而不是软链：Samba 对符号链接的处理依客户端和 unix extensions 而定，
+    Windows 资源管理器常见打不开；硬链接在 SMB 里就是普通文件，也不额外占空间。
+    """
+    d = os.path.join(IMG_ROOT, "_latest")
+    os.makedirs(d, exist_ok=True)
+    dest = os.path.join(d, host_slug(url) + ".png")
+    try:
+        if os.path.lexists(dest):
+            os.remove(dest)
+        os.link(out, dest)
+    except OSError:
+        try:
+            shutil.copy2(out, dest)  # 跨文件系统等情况下退化为复制
+        except Exception as e:
+            log(f"LATEST 更新失败 {url}: {e}")
+
+
+def write_latest_summary(entries):
+    """_latest/SUMMARY.txt：每站最后一次成功时间 + 本轮结果。
+
+    这个文件是为了避免「_latest 里那张图是几小时前的，但我不知道」——
+    站点失败时旧图会留在原处，靠这里的时间戳和状态区分。
+    """
+    d = os.path.join(IMG_ROOT, "_latest")
+    os.makedirs(d, exist_ok=True)
+    lines = [f"生成时间: {datetime.now():%Y-%m-%d %H:%M:%S}",
+             "说明: 图片名固定为 <域名>.png，每次成功截图后替换；时间是该站最后一次成功的时间。",
+             ""]
+    for e in entries:
+        host = e["host"]
+        p = os.path.join(d, host + ".png")
+        if os.path.exists(p):
+            last = f"{datetime.fromtimestamp(os.path.getmtime(p)):%Y-%m-%d %H:%M:%S}"
+        else:
+            last = "（尚无成功截图）"
+        state = "本轮正常" if e["ok"] else f"本轮失败：{e['err']}"
+        lines.append(f"{host:<26} 最后成功 {last:<20} {state}")
+    try:
+        with open(os.path.join(d, "SUMMARY.txt"), "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+    except Exception as e:
+        log(f"LATEST 写 SUMMARY 失败: {e}")
+
+
 def alert(fails, oks, retried):
     """本轮有请求失败时推送到钉钉/企业微信；没配置就只写日志。
 
@@ -317,6 +365,7 @@ def main():
     ok, fail = 0, 0
     fails, oks = [], []
     changed, recovered = [], []
+    summary = []
     with sync_playwright() as p:
         browser = p.chromium.launch(
             executable_path=exe,
@@ -333,6 +382,8 @@ def main():
                     oks.append(slug)
                     print(f"OK   {url}  ->  {out}  ({w}x{hgt})")
                     log(f"OK {url} -> {out} {w}x{hgt}")
+                    update_latest(url, out)
+                    summary.append({"host": slug, "ok": True, "err": ""})
                     try:
                         rec = health.on_ok(slug)
                     except Exception as e:
@@ -354,12 +405,15 @@ def main():
                         log(f"HEALTH 写状态失败 {slug}: {e}")
                     st["url"] = url
                     fails.append((url, err or "未知错误", st))
+                    summary.append({"host": slug, "ok": False,
+                                    "err": (err or "未知错误").splitlines()[0][:90]})
                     state_txt = ("已报警" if st.get("action") == "alert" else "降频静默")
                     print(f"FAIL {url}  {err}  [连续第 {st.get('fail_count', 1)} 次 / {state_txt}]")
                     log(f"FAIL {url} {err} | 连续第 {st.get('fail_count', 1)} 次 | {state_txt}")
         finally:
             browser.close()
     print(f"done ok={ok} fail={fail} changed={len(changed)} recovered={len(recovered)}")
+    write_latest_summary(summary)
 
     if any(len(f) >= 3 and f[2].get("action") == "alert" for f in fails):
         alert(fails, oks, RETRIED)

@@ -142,6 +142,8 @@ loginctl show-user stone | grep Linger     # 应显示 Linger=yes
 状态与日志留在 `~/webcapture/`（不对外）。
 
 ```
+~/public/webcapture/_latest/<域名>.png                 # 每站最新一张（硬链接，名字固定）
+~/public/webcapture/_latest/SUMMARY.txt                # 每站最后成功时间 + 本轮结果
 ~/public/webcapture/<域名>/<YYYY-MM-DD>/<HHMMSS>.png   # 成品（带水印）
 ~/public/webcapture/_diffs/<域名>/<时间>.png            # 红框标出变化的差异图
 ~/webcapture/state/<域名>.{json,txt,prev.png}          # 基线：哈希 / 上轮文本 / 上轮裸图
@@ -150,12 +152,19 @@ loginctl show-user stone | grep Linger     # 应显示 Linger=yes
 ~/webcapture/run.out         # 每轮汇总
 ```
 
+`_latest/` 用**硬链接**而不是软链：Samba 对符号链接的处理依客户端和 `unix extensions` 而定，
+Windows 资源管理器常打不开；硬链接在 SMB 里就是普通文件，且不额外占空间（同一 inode）。
+
+站点失败时**旧图会留在 `_latest/` 不动**，靠 `SUMMARY.txt` 里的「最后成功」时间区分——
+所以看最新状态是先扫一眼 SUMMARY，而不是只看图。
+
 ### 内网访问（SMB）
 
 `/etc/samba/smb.conf` 里已有 `[public]` 段指向 `/home/stone/public`，匿名只读浏览即可：
 
 ```
 Windows      \\10.168.1.152\public\webcapture
+             \\10.168.1.152\public\webcapture\_latest     ← 只看当前状态用这个
 macOS        smb://10.168.1.152/public/webcapture
 Linux        smbclient //10.168.1.152/public -N
 ```

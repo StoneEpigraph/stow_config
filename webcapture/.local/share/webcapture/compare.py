@@ -25,6 +25,7 @@ DEFAULT_CONF = {
     "ALERT_ON_IMAGE_CHANGE": "0",
     "IMAGE_DIFF_THRESHOLD": "0.02",
     "IGNORE_REGEX": r"^\d+/\d+$|^\d{1,2}:\d{2}(:\d{2})?$",
+    "STRIP_DATE_PREFIX": "1",
     "MAX_SNIPPET_LINES": "6",
 }
 
@@ -42,17 +43,35 @@ def load_conf():
     return conf
 
 
+# 行首的「YYYY年M月D日 星期X」：属于站点顶栏的当日日期，不是内容。
+# 有的站点这条时有时无（见 capture.py 里 window.onload 的说明），必须剥掉否则每轮误报。
+# 注意两点，否则会把正常内容吃掉：
+#   1. 必须后面还有实际内容（\s+(?=\S)）—— 有站点的正文里就有「整行只有一个日期」的条目
+#      （如 bjjdzx 的 1844年10月24日 / 1928年10月24日），整行只有一个日期不能被剥空；
+#   2. 剥完只剩「星期六」这种残片也要丢掉。
+DATE_PREFIX_RE = re.compile(
+    r"^\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日"
+    r"(\s*星期[一二三四五六日天])?\s+(?=\S)"
+)
+WEEKDAY_ONLY_RE = re.compile(r"^星期[一二三四五六日天]$")
+
+
 def norm_text(raw):
-    """归一化：去零宽字符、行尾空白、连续空白、可选忽略行。"""
+    """归一化：去零宽字符、行尾空白、连续空白、行首日期前缀、可选忽略行。"""
     conf = load_conf()
     ignore = conf.get("IGNORE_REGEX", "")
     pat = re.compile(ignore) if ignore else None
+    strip_date = conf.get("STRIP_DATE_PREFIX", "1") not in ("0", "false", "no", "")
     lines = []
     for ln in (raw or "").splitlines():
         ln = ln.replace("\u200b", "").replace("\xa0", " ")
         ln = re.sub(r"[ \t]+", " ", ln).strip()
         if not ln:
             continue
+        if strip_date:
+            ln = DATE_PREFIX_RE.sub("", ln).strip()
+            if not ln or WEEKDAY_ONLY_RE.match(ln):
+                continue
         if pat and pat.search(ln):
             continue
         lines.append(ln)

@@ -178,6 +178,22 @@ def shoot(browser, url):
             page.wait_for_load_state("networkidle", timeout=12000)
         except Exception:
             pass
+        # 有些站点（如 bjyouth.gov.cn）的日期/星期是在 window.onload 里填进
+        # #currentDate / #currentDayOfWeek 的，而 window.onload 要等所有第三方资源
+        # （百度统计、党政机关标识 dcs.conac.cn 等）加载完才触发 —— 实测快时 2s、
+        # 慢时 20s+、偶尔整轮都不填，于是同一页面的 innerText 在
+        # 「有日期」「无日期」两种状态间随机跳变 → 文本哈希误报。
+        # 这里先等它填上（让归档截图尽量一致），等不到不阻塞；
+        # 真正的兜底是 compare.py 里剥掉行首日期前缀。
+        try:
+            if page.evaluate("() => !!document.getElementById('currentDate')"):
+                page.wait_for_function(
+                    "() => { const e = document.getElementById('currentDate');"
+                    " return e && e.textContent.trim().length > 0; }",
+                    timeout=int(os.environ.get("WEB_DATE_WAIT_MS", "6000")),
+                )
+        except Exception:
+            log(f"DATE {url} 未在等待期内填充（不影响截图）")
         # 滚动触发懒加载
         try:
             page.evaluate("""async () => {

@@ -128,12 +128,21 @@ loginctl show-user stone | grep Linger     # 应显示 Linger=yes
 | `ALERT_ON_IMAGE_CHANGE` | 0 | 图像变化也报警（噪声大，默认关） |
 | `IMAGE_DIFF_THRESHOLD` | 0.02 | 变化像素占比阈值（2%） |
 | `IGNORE_REGEX` | `^\d+/\d+$\|^\d{1,2}:\d{2}(:\d{2})?$` | 丢噪声行；默认滤轮播页码和纯时间 |
+| `STRIP_DATE_PREFIX` | 1 | 剥掉行首「YYYY年M月D日 星期X」前缀 |
 | `MAX_SNIPPET_LINES` | 6 | 报警里每站最多列几行 diff |
 
 **第一次运行只建基线，不报警**（没有可比对象）。想重建基线就删 `~/webcapture/state/<host>.json`。
 
 已知噪声：轮播图（页码/图片本身）、访问量计数、`星期X`、日期。文本侧靠 `IGNORE_REGEX` 消化；
 图像侧因为默认 `ALERT_ON_IMAGE_CHANGE=0`，只记录不报警。
+
+`STRIP_DATE_PREFIX` 是给 bjyouth.gov.cn 这类站兜底的：它的顶栏日期由
+`window.onload` 里的 JS 填进 `#currentDate`，而 `window.onload` 要等百度统计、
+党政机关标识等第三方资源加载完才触发 —— 实测快时 2s、慢时 20s+、偶尔整轮都不填。
+于是同一页面的 `innerText` 在「有日期」「无日期」之间随机跳变，每跳一次就报一次变更。
+`capture.py` 会先等它填上（`WEB_DATE_WAIT_MS`，默认 6s），等不到也照常截图；
+`compare.py` 再剥掉行首日期前缀，两边都不依赖对方。注意规则只剥「日期后面还有内容」的行，
+正文里「整行只有一个日期」的条目（如 bjjdzx 的 `1844年10月24日`）会原样保留。
 
 
 ## 产物

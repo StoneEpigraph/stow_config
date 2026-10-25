@@ -108,6 +108,45 @@ loginctl show-user stone | grep Linger     # 应显示 Linger=yes
 | `.local/share/webcapture/setup.sh` | 一次性环境准备 |
 | `.config/systemd/user/webcapture.*` | 每 15 分钟的 user timer |
 
+## 动效冻结（capture.py）
+
+整页截图最大的假差异来源不是内容变了，而是**轮播图转到了第几张、横向滚动条滚到哪一像素**。
+实测同一站点两轮之间：bjyouth 大图 14.59%、bjjdzx 横向滚动条 16.71%。冻结后降到 **0.02%–0.05%**。
+
+截图前（懒加载滚动完、等图片就绪后）执行一次 `freeze_motion()`：
+
+1. **滚动归零**：所有元素 `scrollLeft/scrollTop` 置 0，`window.scrollTo(0,0)`，同源 iframe 递归处理
+2. **轮播停播**：Swiper（`slideTo(0)` + `autoplay.stop()`）、Slick、Owl、Bootstrap、Splide 各自 API
+3. **轨道归位**：SuperSlide 这类用 inline `left: -Npx` 位移的把 `left` 归零**并关闭过渡**；
+   Swiper/layui 用 `transform` 位移的把 transform 置 `none`
+4. **圆点归一**：分页高亮移回第一个，避免「图是第 1 张、点还亮在第 3 个」
+5. **冻住定时器**：从文档创建起挂钩 `setInterval/setTimeout`，收尾时清空已注册的定时器
+   并封住新的 `set*/requestAnimationFrame` —— 这是 theScrollTank 这类「每 tick 推 1px」的唯一有效手段
+
+⚠️ 两个踩过的坑：
+
+- **复位要在冻结之后再做一次**。第一次复位后到冻住之间还有 120ms，还在跑的轮播会把走过
+  的那几像素重新写回 inline left（实测 -2px / -3px 不稳定），两轮仍然差 1~3px。
+- **`left` 复位必须同时 `transition: none`**。SuperSlide 用 CSS 过渡做动画，而
+  `screenshot(animations="disabled")` 会把进行中的过渡**快进到终点**，
+  刚复位的位置又被推回原来那张幻灯片（实测两轮差 6%）。
+
+图片加载另有两道保障：
+
+- `wait_images()`：对所有 `<img>` 调 `decode()`，确保「可上屏」而不只是「已下载」
+  （bjyouth 有张 1.2MB 图会出现 `complete=false` 但 `naturalWidth=1080` 的瞬态）
+- **持久 profile**（`~/.cache/webcapture-profile`）复用 HTTP 磁盘缓存：bjjdzx 主页 96 张图，
+  冷缓存一轮 60 多张来不及下载，截图里一片空白格；缓存命中后未就绪图片 67 → 1~3 张，
+  单轮耗时也从 ~70s 降到 ~22s
+
+| 环境变量 | 默认 | 含义 |
+|---|---|---|
+| `WEB_FREEZE_MOTION` | 1 | 设 0 关闭动效冻结 |
+| `WEB_IMAGE_WAIT_MS` | 3000 | 等图片就绪的上限（毫秒） |
+| `WEB_DATE_WAIT_MS` | 6000 | 等 `#currentDate` 填充的上限（毫秒） |
+
+profile 目录可随时删（会重建，只是下一轮变慢）：`rm -rf ~/.cache/webcapture-profile`。
+
 ## 变更检测（compare.py）
 
 两路信号：

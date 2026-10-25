@@ -35,6 +35,233 @@ LOG = os.path.join(OUT_ROOT, "capture.log")
 BROWSER_CANDIDATES = ["/usr/bin/chromium", "/usr/bin/google-chrome-stable"]
 VIEWPORT = {"width": 1440, "height": 900}
 
+# ── 动效冻结 ────────────────────────────────────────────────────────────────
+# 目的：轮播图、横向滚动条（theScrollTank）、数字滚动等「JS 定时器驱动」的东西
+# 每轮截图位置都不同，会让两次截图的图像差异动辄 5%~15%，把真正的内容变化淹掉。
+# 做法是「回到初始位置 + 停掉驱动」：
+#   1) 所有容器 scrollLeft/scrollTop 归零（含同源 iframe）
+#   2) 已知轮播库调各自 API 停播并 slideTo(0)
+#   3) SuperSlide 这类用 inline `left: -Npx` 位移的，把 left 归零
+#   4) Swiper/layui 这类用 transform 位移的，把 track 的 transform 置 none
+#   5) 分页圆点状态归一（否则图是第 1 张、点还亮在第 3 个）
+#   6) 冻住定时器：清掉页面注册过的 setInterval、封住新的 set*/rAF
+# 注意：CSS 动画/过渡不归这里管 —— page.screenshot(animations="disabled")
+# 已经会让有限动画快进到终态、无限动画回到初始态，比手工 pause 更稳。
+MOTION_INIT_JS = r"""
+(() => {
+  if (window.__wcMotionHooked) return;
+  window.__wcMotionHooked = true;
+  const origSetInterval = window.setInterval.bind(window);
+  const origClearInterval = window.clearInterval.bind(window);
+  const origSetTimeout = window.setTimeout.bind(window);
+  const origClearTimeout = window.clearTimeout.bind(window);
+  const ivs = new Set();
+  const tms = new Set();
+  window.__wcOrigTimeout = origSetTimeout;
+  window.setInterval = function (fn, ms) {
+    const id = origSetInterval(fn, ms);
+    ivs.add(id);
+    return id;
+  };
+  window.clearInterval = function (id) { ivs.delete(id); return origClearInterval(id); };
+  window.setTimeout = function (fn, ms) {
+    if (typeof fn !== 'function') return origSetTimeout(fn, ms);
+    let id;
+    id = origSetTimeout(function () { tms.delete(id); return fn.apply(this, arguments); }, ms);
+    tms.add(id);
+    return id;
+  };
+  window.clearTimeout = function (id) { tms.delete(id); return origClearTimeout(id); };
+  window.__wcTimerCount = function () { return ivs.size + tms.size; };
+  // clearPending=true 时连已挂起的 setTimeout 一起清（递归 setTimeout 的轮播
+  // 否则还会再往前走一格）
+  window.__wcFreezeTimers = function (clearPending) {
+    ivs.forEach(function (id) { origClearInterval(id); });
+    ivs.clear();
+    if (clearPending) {
+      tms.forEach(function (id) { origClearTimeout(id); });
+      tms.clear();
+    }
+    window.setInterval = function () { return 0; };
+    window.setTimeout = function () { return 0; };
+    window.requestAnimationFrame = function () { return 0; };
+  };
+})();
+"""
+
+FREEZE_JS = r"""
+async () => {
+  const rep = {scrolls: 0, lefts: 0, tf: 0, dots: 0, libs: [], marquee: 0, timers: 0};
+  const origTimeout = window.__wcOrigTimeout || window.setTimeout.bind(window);
+  const sleep = (ms) => new Promise(function (r) { origTimeout(r, ms); });
+  const CAROUSEL = /(carousel|slider|slide|swiper|banner|focus|marquee|scrolltank|slidebox|轮播)/i;
+  const ACTIVE = ['on', 'active', 'cur', 'current', 'selected',
+                  'swiper-pagination-bullet-active', 'layui-this'];
+
+  const docs = [document];
+  (function walkFrames(doc) {
+    doc.querySelectorAll('iframe, frame').forEach(function (f) {
+      try {
+        const d = f.contentDocument;
+        if (d && docs.indexOf(d) < 0) { docs.push(d); walkFrames(d); }
+      } catch (e) {}
+    });
+  })(document);
+
+  const clsOf = (el) => (el.className && typeof el.className === 'string') ? el.className : '';
+  const isCarousel = (el) => !!el && CAROUSEL.test(clsOf(el) + ' ' + (el.id || ''));
+
+  function resetScroll() {
+    docs.forEach(function (doc) {
+      try { (doc.defaultView || window).scrollTo(0, 0); } catch (e) {}
+      doc.querySelectorAll('*').forEach(function (el) {
+        if (el.scrollLeft > 0) { el.scrollLeft = 0; rep.scrolls++; }
+        if (el.scrollTop > 0) { el.scrollTop = 0; }
+      });
+    });
+  }
+
+  function stopLibs() {
+    docs.forEach(function (doc) {
+      const w = doc.defaultView || window;
+      doc.querySelectorAll('.swiper, .swiper-container').forEach(function (el) {
+        const s = el.swiper;
+        if (!s) return;
+        try { if (s.autoplay && s.autoplay.running) s.autoplay.stop(); } catch (e) {}
+        try { s.slideTo(0, 0, false); } catch (e) {}
+        rep.libs.push('swiper');
+      });
+      doc.querySelectorAll('.splide').forEach(function (el) {
+        const s = el.splide;
+        if (!s) return;
+        try { s.pause(); } catch (e) {}
+        try { s.go(0); } catch (e) {}
+        rep.libs.push('splide');
+      });
+      try {
+        const bs = w.bootstrap;
+        if (bs && bs.Carousel) {
+          doc.querySelectorAll('.carousel').forEach(function (el) {
+            const inst = bs.Carousel.getInstance(el);
+            if (!inst) return;
+            try { inst.pause(); } catch (e) {}
+            try { inst.to(0); } catch (e) {}
+            rep.libs.push('bootstrap');
+          });
+        }
+      } catch (e) {}
+      const $ = w.jQuery;
+      if ($ && $.fn) {
+        try {
+          $('.slick-slider').each(function () {
+            try { $(this).slick('slickPause'); $(this).slick('slickGoTo', 0, true); rep.libs.push('slick'); } catch (e) {}
+          });
+        } catch (e) {}
+        try {
+          $('.owl-carousel').each(function () {
+            try {
+              $(this).trigger('stop.owl.autoplay');
+              $(this).trigger('to.owl.carousel', [0, 0]);
+              rep.libs.push('owl');
+            } catch (e) {}
+          });
+        } catch (e) {}
+        // 仍排在队列里的 jQuery 动画一律停掉（theScrollTank 这类会自己往回推）
+        try { $(':animated').stop(true, false); } catch (e) {}
+        try { $('[class*=slideBox] ul').stop(true, false); } catch (e) {}
+      }
+    });
+  }
+
+  function resetTracks() {
+    docs.forEach(function (doc) {
+      const w = doc.defaultView || window;
+      doc.querySelectorAll('*').forEach(function (root) {
+        if (!isCarousel(root)) return;
+        const nodes = [root].concat(Array.prototype.slice.call(root.querySelectorAll('*'), 0, 150));
+        nodes.forEach(function (n) {
+          const st = n.getAttribute && n.getAttribute('style');
+          if (st && /left\s*:\s*-/.test(st)) {
+            n.style.left = '0px';
+            // 必须同时关掉过渡：SuperSlide 这类是 `transition: left .3s` 做动画，
+            // 截图时 Playwright 的 animations="disabled" 会把进行中的过渡**快进到终点**，
+            // 于是刚复位的位置又被推回原来那张幻灯片（实测同一站两轮差 6%）。
+            n.style.transition = 'none';
+            rep.lefts++;
+          }
+          const tf = w.getComputedStyle(n).transform;
+          if (tf && tf !== 'none' && tf !== 'matrix(1, 0, 0, 1, 0, 0)') {
+            // 只动「像一条轨道」的元素（多个子节点或本身内容超宽），避免误伤装饰性 transform
+            if (n.children.length > 1 || n.scrollWidth - n.clientWidth > 8) {
+              n.style.transform = 'none';
+              n.style.transition = 'none';
+              rep.tf++;
+            }
+          }
+        });
+      });
+    });
+  }
+
+  function resetDots() {
+    const BOX = /(hd|dots?|pagination|indicator|nav|thumb)/i;
+    docs.forEach(function (doc) {
+      doc.querySelectorAll('*').forEach(function (box) {
+        if (!BOX.test(clsOf(box))) return;
+        const par = box.parentElement;
+        if (!isCarousel(par) && !(par && isCarousel(par.parentElement))) return;
+        const items = Array.prototype.filter.call(
+          box.querySelectorAll('li, span, a, i'),
+          function (n) { return n.children.length === 0 && !n.textContent.trim(); }
+        );
+        if (items.length < 2) return;
+        const act = [];
+        items.forEach(function (n) {
+          ACTIVE.forEach(function (k) { if (n.classList.contains(k)) act.push(k); });
+        });
+        if (!act.length) return;
+        items.forEach(function (n, i) { act.forEach(function (k) { n.classList.toggle(k, i === 0); }); });
+        rep.dots++;
+      });
+    });
+  }
+
+  function stopMarquee() {
+    docs.forEach(function (doc) {
+      doc.querySelectorAll('marquee').forEach(function (m) {
+        try { m.stop(); } catch (e) {}
+        try { m.scrollLeft = 0; } catch (e) {}
+        rep.marquee++;
+      });
+    });
+  }
+
+  resetScroll();
+  stopLibs();
+  resetTracks();
+  resetDots();
+  stopMarquee();
+  await sleep(120);
+  resetScroll();
+  if (window.__wcFreezeTimers) {
+    rep.timers = window.__wcTimerCount ? window.__wcTimerCount() : 0;
+    window.__wcFreezeTimers(true);
+  }
+  // 关键：定时器冻住后再复位一次。第一次复位之后、冻住之前，还在跑的轮播
+  // 会把这 120ms 里走过的那几像素重新写回 inline left（实测 -2px / -3px 不稳定），
+  // 于是两轮截图仍然差 1~3px。冻住之后的这次复位才是最终落点。
+  rep.scrolls = 0;
+  rep.lefts = 0;
+  rep.tf = 0;
+  resetScroll();
+  resetTracks();
+  await sleep(80);
+  resetScroll();
+  rep.libs = Array.from(new Set(rep.libs));
+  return rep;
+}
+"""
+
 # 本轮「第一次失败但重试后成功」的 URL，用于报警文案
 RETRIED = []
 
@@ -138,21 +365,133 @@ def add_watermark(src, dst, url, ts_text):
     return w, h
 
 
-def shoot(browser, url):
-    now = datetime.now()
-    ts_text = f"{now:%Y-%m-%d %H:%M:%S}"
-    outdir = os.path.join(IMG_ROOT, host_slug(url), f"{now:%Y-%m-%d}")
-    os.makedirs(outdir, exist_ok=True)
-    out = os.path.join(outdir, f"{now:%H%M%S}.png")
+WAIT_IMG_JS = r"""
+async (ms) => {
+  const imgs = Array.from(document.images).filter(function (i) { return i.currentSrc || i.src; });
+  const timeout = new Promise(function (r) { setTimeout(function () { r('timeout'); }, ms); });
+  const one = function (i) {
+    if (i.complete && i.naturalWidth > 0) return Promise.resolve(true);
+    const dec = (i.decode ? i.decode() : Promise.resolve());
+    return dec.then(function () { return true; }).catch(function () { return false; });
+  };
+  // decode() 卡住时不能让整页僵死，用 race 兜住
+  const res = await Promise.race([
+    Promise.all(imgs.map(one)),
+    timeout.then(function () { return null; }),
+  ]);
+  const bad = res ? imgs.filter(function (i, k) { return !res[k]; })
+      : imgs.filter(function (i) { return !(i.complete && i.naturalWidth > 0); });
+  return bad.map(function (i) { return (i.currentSrc || i.src).split('/').pop().slice(0, 40); });
+}
+"""
 
-    ctx = browser.new_context(
+
+def wait_images(page, url):
+    """等所有图片真正可上屏（decode 完成），避免归档里出现空白格。
+
+    只等 `complete` 不够 —— 实测 bjyouth 的缩略图会出现
+    `complete=false` 但 `naturalWidth=1080`（已解码）的瞬时状态，
+    以及偶尔整块空白。上限 WEB_IMAGE_WAIT_MS（默认 3000ms），超时不阻塞。
+    """
+    limit = int(os.environ.get("WEB_IMAGE_WAIT_MS", "3000"))
+    deadline = time.time() + limit / 1000.0
+    while True:
+        remain = max(300, int((deadline - time.time()) * 1000))
+        try:
+            bad = page.evaluate(WAIT_IMG_JS, remain)
+        except Exception:
+            return
+        if not bad:
+            return
+        if time.time() >= deadline:
+            log(f"IMGWAIT {url} 仍有 {len(bad)} 张未就绪: " + ", ".join(bad[:3]))
+            return
+        page.wait_for_timeout(200)
+
+
+def freeze_motion(page, url):
+    """把轮播/横向滚动拉回初始位置并冻住定时器，返回统计（失败不影响截图）。"""
+    if os.environ.get("WEB_FREEZE_MOTION", "1").lower() in ("0", "false", "no", "off"):
+        return None
+    try:
+        rep = page.evaluate(FREEZE_JS)
+    except Exception as e:
+        log(f"FREEZE 跳过 {url}: {type(e).__name__}: {str(e).splitlines()[0]}")
+        return None
+    bits = []
+    if rep.get("libs"):
+        bits.append("轮播库 " + "/".join(rep["libs"]))
+    if rep.get("scrolls"):
+        bits.append(f"归零滚动 {rep['scrolls']} 处")
+    if rep.get("lefts"):
+        bits.append(f"left 归零 {rep['lefts']}")
+    if rep.get("tf"):
+        bits.append(f"transform 复位 {rep['tf']}")
+    if rep.get("dots"):
+        bits.append(f"圆点归一 {rep['dots']}")
+    if rep.get("marquee"):
+        bits.append(f"marquee {rep['marquee']}")
+    if rep.get("timers"):
+        bits.append(f"清定时器 {rep['timers']}")
+    if bits:
+        log(f"FREEZE {url} " + " | ".join(bits))
+    return rep
+
+
+PROFILE_DIR = os.path.expanduser("~/.cache/webcapture-profile")
+
+
+def launch_ctx(p, exe):
+    """带持久 profile 的浏览器上下文。
+
+    用持久 profile 不是为了留 cookie，而是为了复用 **HTTP 磁盘缓存**：
+    bjjdzx 主页有 96 张图（不少 1MB+），冷缓存一轮下来 60 多张来不及下载，
+    截图里就是一片空白格 —— 而「这一轮哪几张空白」每轮都不同，图像差异能到 13%。
+    缓存命中后未就绪图片稳定在个位数（实测 67 → 1~3）。
+    """
+    os.makedirs(PROFILE_DIR, exist_ok=True)
+    kw = dict(
+        executable_path=exe,
+        headless=True,
         viewport=VIEWPORT,
         device_scale_factor=1,
         ignore_https_errors=True,
         user_agent=("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
                     "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"),
         locale="zh-CN",
+        args=["--no-sandbox", "--disable-dev-shm-usage", "--hide-scrollbars",
+              "--disable-gpu", "--lang=zh-CN"],
     )
+    ctx = None
+    for attempt in range(2):
+        try:
+            ctx = p.chromium.launch_persistent_context(PROFILE_DIR, **kw)
+            break
+        except Exception as e:
+            if attempt:
+                raise
+            # 上一轮被 kill 掉时 profile 会留下锁文件，清掉再试一次
+            log(f"PROFILE 复用失败（{type(e).__name__}: {str(e).splitlines()[0]}），清锁重试")
+            for name in ("SingletonLock", "SingletonSocket", "SingletonCookie"):
+                try:
+                    os.remove(os.path.join(PROFILE_DIR, name))
+                except OSError:
+                    pass
+    # 从文档创建起就挂钩定时器，才能在收尾时把它们一次清掉
+    try:
+        ctx.add_init_script(MOTION_INIT_JS)
+    except Exception as e:
+        log(f"FREEZE 挂钩失败: {type(e).__name__}: {e}")
+    return ctx
+
+
+def shoot(ctx, url):
+    now = datetime.now()
+    ts_text = f"{now:%Y-%m-%d %H:%M:%S}"
+    outdir = os.path.join(IMG_ROOT, host_slug(url), f"{now:%Y-%m-%d}")
+    os.makedirs(outdir, exist_ok=True)
+    out = os.path.join(outdir, f"{now:%H%M%S}.png")
+
     page = ctx.new_page()
     last_err = None
     try:
@@ -208,6 +547,13 @@ def shoot(browser, url):
         except Exception:
             pass
         page.wait_for_timeout(1200)
+        # 懒加载图片可能还在下载：不等它落地，同一站点两轮截图的差异会来自
+        # 「这一轮某张图还是空白」
+        wait_images(page, url)
+        # 懒加载都触发完了，现在把轮播/横向滚动拉回初始位置并冻住定时器，
+        # 否则两次截图的差异全来自「这一轮恰好滚到哪儿」
+        freeze_motion(page, url)
+        page.wait_for_timeout(150)
         # 先存裸图（差异对比用裸图，水印每轮都变会污染 diff）
         raw = os.path.join(RAW_DIR, f".tmp-{host_slug(url)}.png")
         os.makedirs(RAW_DIR, exist_ok=True)
@@ -231,7 +577,7 @@ def shoot(browser, url):
         return None, 0, 0, f"{type(e).__name__}: {e}", None
     finally:
         try:
-            ctx.close()
+            page.close()
         except Exception:
             pass
 
@@ -383,16 +729,11 @@ def main():
     changed, recovered = [], []
     summary = []
     with sync_playwright() as p:
-        browser = p.chromium.launch(
-            executable_path=exe,
-            headless=True,
-            args=["--no-sandbox", "--disable-dev-shm-usage", "--hide-scrollbars",
-                  "--disable-gpu", "--lang=zh-CN"],
-        )
+        ctx = launch_ctx(p, exe)
         try:
             for url in urls:
                 slug = host_slug(url)
-                out, w, hgt, err, info = shoot(browser, url)
+                out, w, hgt, err, info = shoot(ctx, url)
                 if out:
                     ok += 1
                     oks.append(slug)
@@ -427,7 +768,7 @@ def main():
                     print(f"FAIL {url}  {err}  [连续第 {st.get('fail_count', 1)} 次 / {state_txt}]")
                     log(f"FAIL {url} {err} | 连续第 {st.get('fail_count', 1)} 次 | {state_txt}")
         finally:
-            browser.close()
+            ctx.close()
     print(f"done ok={ok} fail={fail} changed={len(changed)} recovered={len(recovered)}")
     write_latest_summary(summary)
 

@@ -683,10 +683,12 @@ def alert_changes(changed, total):
         if info.get("text_changed"):
             an, rn = info.get("added_n", 0), info.get("removed_n", 0)
             lines.append(f"文本变更：+{an} 行 / -{rn} 行")
+            # 用全角 ＋/－：钉钉 markdown 会把行首半角 "+"、"-" 解析成列表，
+            # 渲染出来只剩一个圆点，看不到符号本身。
             for s in info.get("added", []):
-                lines.append(f"> + {s[:120]}")
+                lines.append(f"> ＋ {s[:120]}")
             for s in info.get("removed", []):
-                lines.append(f"> - {s[:120]}")
+                lines.append(f"> － {s[:120]}")
         if info.get("img_ratio") is not None:
             lines.append(f"图像变化：{info['img_ratio'] * 100:.2f}%")
         if info.get("img_diff_path"):

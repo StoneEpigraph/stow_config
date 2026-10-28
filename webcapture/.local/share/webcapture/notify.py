@@ -60,12 +60,20 @@ def post_json(url, payload, timeout=12):
 
 
 def _clamp(text, limit_bytes):
-    """按字节截断（企业微信 markdown 单条上限 4096 字节）。"""
+    """按字节截断（企业微信 markdown 单条上限 4096 字节）。
+
+    注意：截断提示本身也要占预算。若剩余预算装不下提示，就直接硬截断 ——
+    否则会出现「只剩截断提示、正文和标题关键词全被吃掉」的情况（钉钉关键词
+    校验会因此报 310000 关键词不匹配，整条报警发不出去）。
+    """
     b = text.encode("utf-8")
     if len(b) <= limit_bytes:
         return text
     tail = "\n\n…（内容过长已截断，完整信息见 ~/webcapture/capture.log）"
-    return b[:max(0, limit_bytes - len(tail.encode()))].decode("utf-8", "ignore") + tail
+    keep = limit_bytes - len(tail.encode())
+    if keep < 32:
+        return b[:max(0, limit_bytes)].decode("utf-8", "ignore")
+    return b[:keep].decode("utf-8", "ignore") + tail
 
 
 def send_dingtalk(conf, title, text):
@@ -80,10 +88,10 @@ def send_dingtalk(conf, title, text):
         )
         hook += f"&timestamp={ts}&sign={urllib.parse.quote_plus(sign)}"
     kw = conf.get("DINGTALK_KEYWORD", "")
-    if kw and kw not in title:
+    if kw and kw not in title and kw not in text:
         title = f"{kw} {title}"
     return post_json(hook, {"msgtype": "markdown",
-                            "markdown": {"title": _clamp(title, 60),
+                            "markdown": {"title": _clamp(title, 200),
                                          "text": _clamp(text, 18000)}})
 
 
@@ -139,6 +147,7 @@ def build_fail_text(ts, fails, oks, retried):
     only_one = n_silent == 0 and len(fails) == 1
 
     lines = [f"**时间**：{ts}",
+             "",
              f"**结果**：失败 {len(fails)} / 共 {len(fails) + len(oks)}",
              ""]
     for item in fails:
@@ -172,7 +181,8 @@ def build_fail_text(ts, fails, oks, retried):
 
 
 def build_recover_text(ts, recovered, total):
-    lines = [f"**时间**：{ts}", f"**已恢复**：{len(recovered)} / {total}", ""]
+    lines = [f"**时间**：{ts}", "",
+             f"**已恢复**：{len(recovered)} / {total}", ""]
     for info in recovered:
         url = info.get("url") or info.get("host", "")
         lines.append(f"- ✅ {url}")
@@ -218,10 +228,10 @@ def main():
         }], 4))
         print()
         print("=== 变更报警（示例）===")
-        print("**时间**：2026-10-22 10:15:03\n**变更站点**：1 / 4\n\n"
-              "**【www.bjjdzx.com】**\n文本变更：+1 行 / -1 行\n"
-              "> ＋ 关于2026年度申报工作的通知\n> － 关于2025年度申报工作的通知\n\n"
-              "图像变化：3.29%\n差异图：~/public/webcapture/_diffs/www.bjjdzx.com/20261022-101503.png")
+        print("**时间**：2026-10-22 10:15:03\n\n**变更站点**：1 / 4\n\n"
+              "**【www.bjjdzx.com】**\n\n文本变更：+1 行 / -1 行\n\n"
+              "```diff\n+ 关于2026年度申报工作的通知\n- 关于2025年度申报工作的通知\n```\n\n"
+              "图像变化：3.29%\n\n差异图：~/public/webcapture/_diffs/www.bjjdzx.com/20261022-101503.png")
         conf = load_conf()
         print(f"\n=== 当前渠道 ===\n钉钉：{'已配置' if conf.get('DINGTALK_WEBHOOK') else '未配置'}"
               f"（加签{'有' if conf.get('DINGTALK_SECRET') else '无'}，"

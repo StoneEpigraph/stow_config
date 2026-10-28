@@ -210,16 +210,24 @@ def check(host, raw_png, page_text, url):
         info.update(added=a, removed=r, added_n=an, removed_n=rn)
 
     # ---- 写回状态 ----
+    try:
+        with Image.open(raw_png) as _im:
+            geom = list(_im.size)
+    except Exception:
+        geom = []
     with open(p["text"], "w", encoding="utf-8") as f:
         f.write(text)
     try:
         os.replace(raw_png, p["prev_raw"])
     except Exception:
         pass
+    # 尺寸 + 文本行数存进 meta：下一轮据此判断「这次是不是没渲染完整」
     save_state(host, {
         "url": url,
         "text_hash": th,
         "text_len": len(text),
+        "text_lines": len(text.splitlines()),
+        "geom": geom,
         "img_ratio": info["img_ratio"],
         "checked_at": f"{datetime.now():%Y-%m-%d %H:%M:%S}",
     })

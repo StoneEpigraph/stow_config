@@ -485,7 +485,44 @@ def launch_ctx(p, exe):
     return ctx
 
 
-def shoot(ctx, url):
+def _prev_meta(host):
+    """读上一轮的 meta（含 geom / text_lines），失败不算错。"""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import compare
+        return compare.load_state(host) or {}
+    except Exception:
+        return {}
+
+
+def _unstable_reason(prev, w, h, text):
+    """本轮快照是否明显「比平时小」—— 页面没渲染完整的典型特征。
+
+    bjydf.cn 实锤过：某一轮合作伙伴的跑马灯 JS 还没初始化，整页只有
+    1440x2751（平时 1557x3085），innerText 里整整少 54 个公司名，
+    于是报警说「删掉了 54 行」，而网站其实一点没变。
+    """
+    if not prev:
+        return ""
+    reasons = []
+    geom = prev.get("geom") or []
+    if len(geom) == 2:
+        try:
+            pw, ph = int(geom[0]), int(geom[1])
+        except (TypeError, ValueError):
+            pw = ph = 0
+        if pw and abs(w - pw) > max(8, pw * 0.02):
+            reasons.append(f"宽 {w} vs 上轮 {pw}")
+        if ph and abs(h - ph) > max(24, ph * 0.03):
+            reasons.append(f"高 {h} vs 上轮 {ph}")
+    pl = int(prev.get("text_lines") or 0)
+    cl = len(text.splitlines())
+    if pl and cl < pl * 0.85:
+        reasons.append(f"文本 {cl} 行 vs 上轮 {pl} 行")
+    return "，".join(reasons)
+
+
+def shoot(ctx, url, allow_retry=True):
     now = datetime.now()
     ts_text = f"{now:%Y-%m-%d %H:%M:%S}"
     outdir = os.path.join(IMG_ROOT, host_slug(url), f"{now:%Y-%m-%d}")
@@ -513,6 +550,10 @@ def shoot(ctx, url):
                 page = ctx.new_page()
                 continue
 
+        try:
+            page.wait_for_load_state("load", timeout=15000)
+        except Exception:
+            log(f"LOAD {url} window.onload 未在 15s 内触发（继续）")
         try:
             page.wait_for_load_state("networkidle", timeout=12000)
         except Exception:
@@ -562,6 +603,23 @@ def shoot(ctx, url):
             page_text = page.evaluate("document.body.innerText") or ""
         except Exception:
             page_text = ""
+
+        # 渲染完整性自检：整页尺寸或文本量相对上一轮骤减，基本就是这轮没渲染全
+        # （图片/脚本还没就绪），不重抓就会变成一条「网站删了一堆内容」的假报警。
+        if allow_retry:
+            try:
+                with Image.open(raw) as _im:
+                    rw, rh = _im.size
+            except Exception:
+                rw = rh = 0
+            why = _unstable_reason(_prev_meta(host_slug(url)), rw, rh, page_text)
+            if why:
+                log(f"UNSTABLE {url} {why} → 重新加载再抓一次")
+                try:
+                    page.close()
+                except Exception:
+                    pass
+                return shoot(ctx, url, allow_retry=False)
 
         w, hgt = add_watermark(raw, out, url, ts_text)
 

@@ -669,17 +669,22 @@ def alert_recovered(recovered, total):
 
 
 def _diff_line(mark, text):
-    """代码块里的一行：压平内部换行/多余空白，并消掉可能撞坏围栏的反引号。"""
-    s = " ".join(str(text).split()).replace("```", "'''")
+    """diff 单行文本：压平内部换行/多余空白。
+
+    mark 必须用全角 ＋ / －：行首半角 `+` `-` 会被 markdown 当成列表标记，
+    渲染出来只剩一个圆点，符号本身看不到。
+    """
+    s = " ".join(str(text).split())
     return f"{mark} {s[:120]}"
 
 
 def alert_changes(changed, total):
     """页面内容/外观有变化时推送。
 
-    钉钉按标准 markdown 渲染：同一段落内的单个 \\n 是软换行，会被合并成空格。
-    所以这里每个逻辑行单独成块（块之间空行），diff 用代码块承载 —— 代码块内
-    换行严格保留，且行首半角的 + / - 不会被当成列表标记吃掉。
+    钉钉的 markdown 只支持很窄的一个子集（标题 / 引用 / 加粗 / 链接 / 列表 / 图片）：
+    - 不支持 ``` 代码块，写围栏也不会保留格式；
+    - 同一段落内的单个 \\n 是软换行，会被合并成一个空格。
+    所以这里每个逻辑行都单独成段（段与段之间空一行），diff 行用全角 ＋/－ 起头。
     """
     try:
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -694,10 +699,10 @@ def alert_changes(changed, total):
         if info.get("text_changed"):
             an, rn = info.get("added_n", 0), info.get("removed_n", 0)
             blocks.append(f"文本变更：+{an} 行 / -{rn} 行")
-            diff_lines = [_diff_line("+", s) for s in info.get("added", [])]
-            diff_lines += [_diff_line("-", s) for s in info.get("removed", [])]
-            if diff_lines:
-                blocks.append("```diff\n" + "\n".join(diff_lines) + "\n```")
+            for s in info.get("added", []):
+                blocks.append(_diff_line("＋", s))
+            for s in info.get("removed", []):
+                blocks.append(_diff_line("－", s))
         if info.get("img_ratio") is not None:
             blocks.append(f"图像变化：{info['img_ratio'] * 100:.2f}%")
         if info.get("img_diff_path"):

@@ -230,7 +230,7 @@ def main():
         print("=== 变更报警（示例）===")
         print("**时间**：2026-10-22 10:15:03\n\n**变更站点**：1 / 4\n\n"
               "**【www.bjjdzx.com】**\n\n文本变更：+1 行 / -1 行\n\n"
-              "```diff\n+ 关于2026年度申报工作的通知\n- 关于2025年度申报工作的通知\n```\n\n"
+              "＋ 关于2026年度申报工作的通知\n\n－ 关于2025年度申报工作的通知\n\n"
               "图像变化：3.29%\n\n差异图：~/public/webcapture/_diffs/www.bjjdzx.com/20261022-101503.png")
         conf = load_conf()
         print(f"\n=== 当前渠道 ===\n钉钉：{'已配置' if conf.get('DINGTALK_WEBHOOK') else '未配置'}"

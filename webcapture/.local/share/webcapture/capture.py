@@ -868,6 +868,8 @@ def _report_change(url, info, bucket):
         log(f"BASELINE {url} 已建立基线")
         return
     bits = []
+    if info.get("reordered"):
+        bits.append(f"顺序变化 {info.get('reorder_rows', 0)} 行（内容相同，忽略）")
     if info.get("text_changed"):
         bits.append(f"文本 +{info.get('added_n', 0)}/-{info.get('removed_n', 0)} 行")
         for s in info.get("added", [])[:3]:

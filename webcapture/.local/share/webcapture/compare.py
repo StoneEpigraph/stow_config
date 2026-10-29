@@ -108,8 +108,8 @@ def save_state(host, meta):
         json.dump(meta, f, ensure_ascii=False, indent=2)
 
 
-def text_diff(old_text, new_text, max_lines=6):
-    """返回 (added, removed) 行列表，超出截断。"""
+def text_diff(old_text, new_text, max_lines=None):
+    """返回 (added, removed, added_n, removed_n)；max_lines 不为 None 时截断列表。"""
     import difflib
     old_l = old_text.splitlines()
     new_l = new_text.splitlines()
@@ -121,7 +121,9 @@ def text_diff(old_text, new_text, max_lines=6):
             added.append(line[1:].strip())
         elif line.startswith("-"):
             removed.append(line[1:].strip())
-    return added[:max_lines], removed[:max_lines], len(added), len(removed)
+    if max_lines:
+        return added[:max_lines], removed[:max_lines], len(added), len(removed)
+    return added, removed, len(added), len(removed)
 
 
 def image_diff(prev_path, cur_path, out_path=None, threshold_pixel=25, save_min_ratio=0.003):
@@ -199,15 +201,25 @@ def check(host, raw_png, page_text, url):
     if prev is None or "text_hash" not in prev:
         info["baseline"] = True
     elif prev["text_hash"] != th:
-        info["text_changed"] = True
         old_text = ""
         if os.path.exists(p["text"]):
             try:
                 old_text = open(p["text"], encoding="utf-8").read()
             except Exception:
                 pass
-        a, r, an, rn = text_diff(old_text, text, int(conf.get("MAX_SNIPPET_LINES", "6")))
-        info.update(added=a, removed=r, added_n=an, removed_n=rn)
+        max_n = int(conf.get("MAX_SNIPPET_LINES", "6"))
+        a_full, r_full, an, rn = text_diff(old_text, text)
+        # 「只是换了顺序」：删掉的行和新增的行内容完全相同（只是位置不同）。
+        # bjjdzx 的横向滚动列表会把第一个 li 轮转到末尾，DOM 顺序变了一格 →
+        # 报警说「+LSD / -LSD」，而截图 0.00% 差异、网页一个字没改。
+        if (an or rn) and sorted(a_full) == sorted(r_full) \
+                and conf.get("IGNORE_REORDER", "1") != "0":
+            info["reordered"] = True
+            info["reorder_rows"] = an
+        else:
+            info["text_changed"] = True
+            info.update(added=a_full[:max_n], removed=r_full[:max_n],
+                        added_n=an, removed_n=rn)
 
     # ---- 写回状态 ----
     try:

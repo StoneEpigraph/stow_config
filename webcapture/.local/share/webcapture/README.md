@@ -169,11 +169,18 @@ profile 目录可随时删（会重建，只是下一轮变慢）：`rm -rf ~/.c
 | `IGNORE_REGEX` | `^\d+/\d+$\|^\d{1,2}:\d{2}(:\d{2})?$` | 丢噪声行；默认滤轮播页码和纯时间 |
 | `STRIP_DATE_PREFIX` | 1 | 剥掉行首「YYYY年M月D日 星期X」前缀 |
 | `MAX_SNIPPET_LINES` | 6 | 报警里每站最多列几行 diff |
+| `IGNORE_REORDER` | 1 | 「只是换了顺序」不报警：删掉的行和新增的行内容完全相同、只是位置不同 |
 
 **第一次运行只建基线，不报警**（没有可比对象）。想重建基线就删 `~/webcapture/state/<host>.json`。
 
-已知噪声：轮播图（页码/图片本身）、访问量计数、`星期X`、日期。文本侧靠 `IGNORE_REGEX` 消化；
-图像侧因为默认 `ALERT_ON_IMAGE_CHANGE=0`，只记录不报警。
+已知噪声：轮播图（页码/图片本身）、访问量计数、`星期X`、日期、**列表顺序轮转**。
+文本侧靠 `IGNORE_REGEX` 和 `IGNORE_REORDER` 消化；图像侧因为默认 `ALERT_ON_IMAGE_CHANGE=0`，只记录不报警。
+
+`IGNORE_REORDER` 是给 bjjdzx.com 那种横向滚动列表兜底的：页面里有个 `.theScrollTank`
+（轨道宽 10000px、`overflow:hidden`）装着一排条目（LSD、K粉、摇头丸…），每条滚过一个条目宽就把
+第一个 `li` 挪到队尾 —— DOM 顺序换了一格，于是 `innerText` 报 `+LSD / -LSD`，
+而截图 0.00% 差异、网页一个字没改。判定规则是「新增行集合 == 删除行集合（含重复计数）」，
+命中就只写日志「顺序变化 N 行（内容相同，忽略）」，不进报警队列。
 
 `STRIP_DATE_PREFIX` 是给 bjyouth.gov.cn 这类站兜底的：它的顶栏日期由
 `window.onload` 里的 JS 填进 `#currentDate`，而 `window.onload` 要等百度统计、

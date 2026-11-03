@@ -58,7 +58,9 @@ wait_network() {
 wait_network
 
 echo "[$(date '+%F %T')] ---- run start ($PY) ----" >> "$OUT/run.out"
-"$PY" -u "$BASE/capture.py" >> "$OUT/run.out" 2>&1
+# 传参则只跑指定站点（调试用），不传则用 capture.py 内置的 DEFAULT_URLS。
+# 定时任务不传参，行为和以前完全一致。
+"$PY" -u "$BASE/capture.py" "$@" >> "$OUT/run.out" 2>&1
 rc=$?
 
 # 保留策略：RETENTION_DAYS>0 时清理过期截图（默认关闭，可用环境变量覆盖）

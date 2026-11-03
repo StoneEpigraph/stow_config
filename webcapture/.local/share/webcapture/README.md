@@ -3,6 +3,9 @@
 每 15 分钟对固定几个网址整页截图，图上打时间水印；请求失败推送到钉钉/企业微信群机器人，
 站点恢复正常时再推一条「已恢复」，形成闭环。
 
+> **先看操作手册**：[USAGE.md](USAGE.md) —— 安装、配置、运维、排障，Linux 与 Windows 并列。
+> 本文件是 Linux 侧的设计细节与踩坑记录；Windows 差异补充见 [README-windows.md](README-windows.md)。
+
 ## 部署到新机器
 
 ```bash
@@ -105,7 +108,9 @@ loginctl show-user stone | grep Linger     # 应显示 Linger=yes
 | `.local/share/webcapture/shot.sh` | 入口：找解释器、flock 防重叠、日志、清理 |
 | `.local/share/webcapture/notify.py` | 钉钉/企业微信 webhook 报警 |
 | `.local/share/webcapture/health.py` | 站点健康状态：连续失败计数、降频、恢复判定 |
+| `.local/share/webcapture/paths.py` | 跨平台路径 / 浏览器 / 字体探测（Linux + Windows） |
 | `.local/share/webcapture/setup.sh` | 一次性环境准备 |
+| `.local/share/webcapture/setup.ps1` / `shot.ps1` / `install-task.ps1` | Windows 版入口与计划任务 |
 | `.config/systemd/user/webcapture.*` | 每 15 分钟的 user timer |
 
 ## 动效冻结（capture.py）
@@ -244,9 +249,13 @@ IP 现在由 dhcpcd 从路由器获取，**换网络会变**；想固定就用�
 
 ## 注意
 
+- 路径、浏览器、字体、UA 的探测集中在 `paths.py`，Linux 与 Windows 共用；
+  两个平台上目录默认值不同（Windows 用 `%LOCALAPPDATA%` 存 venv/profile），
+  全部可用 `WEBCAPTURE_*` 环境变量覆盖，见 README-windows.md。
 - `/tmp` 若是小容量 tmpfs，pip 会报「设备上没有空间」；`shot.sh`/`setup.sh` 已把 `TMPDIR`
   指到 `~/.cache/webcapture-tmp`，Chromium 也带 `--disable-dev-shm-usage`。
-- 不给 Playwright 下载自带 Chromium，直接用系统 `chromium`/`google-chrome-stable`。
+- 默认不下载 Playwright 自带 Chromium，直接用系统浏览器（`paths.py` 按平台探测 Chrome / Edge /
+  chromium）；Windows 上两个都没有时用 `setup.ps1 -InstallBrowser` 补一个。
 - 水印用中灰+浅描边，纯白字在白底页面会看不见。
 - 磁盘占用约 300–500MB/天；要自动清理就把环境变量 `RETENTION_DAYS=7` 传进去（默认 0 = 不删）。
   用 systemd 的话在 `webcapture.service` 里加 `Environment=RETENTION_DAYS=7`。

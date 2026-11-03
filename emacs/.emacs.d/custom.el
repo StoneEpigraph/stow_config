@@ -222,19 +222,18 @@
      "/home/stone/resource/dailyNotes/todolist.org"))
  '(org-agenda-insert-diary-extract-time nil)
  '(package-selected-packages
-   '(backup-each-save baidu-translate company eaf-markmap elfeed
-		      embark-consult epc faceup flycheck fzf
-		      indent-guide keycast keyfreq less-css-mode
-		      lsp-python-ms lsp-treemacs lsp-ui lua-mode
-		      marginalia markdown-ts-mode mood-one-theme
-		      multiple-cursors orderless org org-bullets
-		      org-download ox-hugo pandoc-mode peg
+   '(backup-each-save baidu-translate company cperl-mode csharp-mode
+		      eaf-markmap editorconfig elfeed embark-consult
+		      epc faceup flycheck flymake fzf indent-guide
+		      keycast keyfreq lsp-python-ms lsp-treemacs
+		      lsp-ui lua-mode marginalia markdown-ts-mode
+		      mood-one-theme multiple-cursors orderless org
+		      org-bullets org-download ox-hugo pandoc-mode peg
 		      rainbow-delimiters rg rust-mode smartparens
-		      swiper timeout tramp transient
-		      treemacs-icons-dired treemacs-persp
-		      treemacs-projectile treesit-auto uuid vertico
-		      w3m wallpaper web-mode wgrep which-key
-		      window-numbering yasnippet-snippets))
+		      swiper timeout tramp treemacs-icons-dired
+		      treemacs-persp treemacs-projectile treesit-auto
+		      verilog-mode vertico w3m web-mode wgrep
+		      which-key window-numbering yasnippet-snippets))
  '(treemacs-show-hidden-files t))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.

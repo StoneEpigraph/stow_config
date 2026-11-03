@@ -1,43 +1,27 @@
-# This is the configuration file for Ghostty.
+# Ghostty 配置（由 stow 包 ghostty 管理）
 #
-# This template file has been automatically created at the following
-# path since Ghostty couldn't find any existing config files on your system:
-#
-#   /home/stone/.config/ghostty/config
-#
-# The template does not set any default options, since Ghostty ships
-# with sensible defaults for all options. Users should only need to set
-# options that they want to change from the default.
-#
-# Run `ghostty +show-config --default --docs` to view a list of
-# all available config options and their default values.
-#
-# Additionally, each config option is also explained in detail
-# on Ghostty's website, at https://ghostty.org/docs/config.
+# 2026-11-03 精简重写。原来这里是一份 171KB 的 `ghostty +show-config` 全量导出，
+# 里面把默认的 command-palette-entry（含 action:open_config）也写死了，导致启动/校验报：
+#   command-palette-entry: invalid value "title:"Open Config",...,action:"open_config""
+# Ghostty 自身的提示：不要把 `+show-config --default` 的输出贴进配置文件，
+# 有些默认值写进配置后彼此冲突。查默认值用 `ghostty +show-config --default --docs`，只看不落地。
+# 旧文件备份：~/ghostty-config.dump-20260514.bak
 
-# Config syntax crash course
-# ==========================
-# # The config file consists of simple key-value pairs,
-# # separated by equals signs.
-# font-family = Iosevka
-# window-padding-x = 2
-#
-# # Spacing around the equals sign does not matter.
-# # All of these are identical:
-# key=value
-# key= value
-# key =value
-# key = value
-#
-# # Any line beginning with a # is a comment. It's not possible to put
-# # a comment after a config option, since it would be interpreted as a
-# # part of the value. For example, this will have a value of "#123abc":
-# background = #123abc
-#
-# # Empty values are used to reset config keys to default.
-# key =
-#
-# # Some config options have unique syntaxes for their value,
-# # which is explained in the docs for that config option.
-# # Just for example:
-# resize-overlay-duration = 4s 200ms
+theme = Tomorrow Night Eighties
+
+# 背景图
+background-image = /home/stone/Pictures/wallpapers/1253579.jpg
+background-image-opacity = 0.1
+background-image-fit = cover
+
+# 窗口尺寸
+window-width = 240
+window-height = 40
+
+scrollback-limit = 10000000
+copy-on-select = true
+
+# 键位微调（只写与默认值不同的部分）
+keybind = ctrl+,=open_config
+keybind = ctrl+shift+page_up=jump_to_prompt:-1
+keybind = ctrl+shift+page_down=jump_to_prompt:1

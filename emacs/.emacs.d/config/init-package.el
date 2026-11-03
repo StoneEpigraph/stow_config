@@ -158,6 +158,21 @@
   :config
   (indent-guide-global-mode t))
 
+;; indent-guide 补丁：窗口切到新缓冲区（如 org-agenda 的 " *Agenda Commands*"）时，
+;; window-scroll-functions 会在 window-start 尚未更新前被调用，此时 (window-start) 仍是
+;; 上一个缓冲区的位置；上个文件大（光标在 todolist.org 底部）时，line-number-at-pos
+;; 就会 args-out-of-range，直接把 C-c a 打断。仅在 window-start 落在当前缓冲区内时绘制。
+(defun my/indent-guide-show-safe (orig &rest args)
+  "Call ORIG only when `window-start' is valid for the current buffer."
+  (let ((start (window-start))
+        (end (window-end nil t)))
+    (when (and (integer-or-marker-p start)
+               (integer-or-marker-p end)
+               (<= (point-min) start (point-max)))
+      (apply orig args))))
+
+(advice-add 'indent-guide-show :around #'my/indent-guide-show-safe)
+
 ;; optional if you want which-key integration
 (use-package which-key
   :defer nil

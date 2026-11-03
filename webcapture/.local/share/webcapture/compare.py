@@ -16,9 +16,11 @@ from datetime import datetime
 
 from PIL import Image, ImageChops, ImageDraw
 
-STATE_DIR = os.path.expanduser("~/webcapture/state")
-DIFF_DIR = os.path.expanduser("~/public/webcapture/_diffs")
-CONF = os.path.expanduser("~/webcapture/compare.conf")
+import paths
+
+STATE_DIR = paths.state_dir()
+DIFF_DIR = os.path.join(paths.img_root(), "_diffs")
+CONF = os.path.join(paths.out_root(), "compare.conf")
 
 DEFAULT_CONF = {
     "ALERT_ON_TEXT_CHANGE": "1",
@@ -130,8 +132,10 @@ def image_diff(prev_path, cur_path, out_path=None, threshold_pixel=25, save_min_
     """对齐到相同宽度与较小高度做逐像素比较。返回变化像素占比。"""
     if not (os.path.exists(prev_path) and os.path.exists(cur_path)):
         return None
-    a = Image.open(prev_path).convert("RGB")
-    b = Image.open(cur_path).convert("RGB")
+    # Windows 上不关句柄，capture.py 后续 os.replace(raw -> prev.png) 会 PermissionError
+    with Image.open(prev_path) as _a, Image.open(cur_path) as _b:
+        a = _a.convert("RGB")
+        b = _b.convert("RGB")
     w = max(a.width, b.width)
     if a.width != w:
         a = a.resize((w, int(a.height * w / a.width)), Image.LANCZOS)

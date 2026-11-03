@@ -20,6 +20,18 @@ from datetime import datetime
 from playwright.sync_api import sync_playwright
 from PIL import Image, ImageDraw, ImageFont
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import health  # noqa: E402  站点健康状态（连续失败计数 / 恢复判定）
+import paths   # noqa: E402  Linux / Windows 路径与外部依赖探测
+
+# Windows 的控制台和重定向默认不是 UTF-8，报警文案里的 emoji 会直接把进程打挂。
+# 这里统一成 UTF-8：Linux 上行为不变，Windows 下无论计划任务还是 cmd 都不会崩。
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 DEFAULT_URLS = [
     "https://www.juanzhuzhongxin.cn/donationWeb/",
     "https://www.bjyouth.gov.cn/",
@@ -27,12 +39,12 @@ DEFAULT_URLS = [
     "https://www.bjydf.cn/",
 ]
 
-OUT_ROOT = os.path.expanduser("~/webcapture")
-# 成品截图对外发布目录（~/public 已由 Samba 共享，内网可直接看）
-IMG_ROOT = os.path.expanduser("~/public/webcapture")
-RAW_DIR = os.path.expanduser("~/webcapture/state/.raw")
-LOG = os.path.join(OUT_ROOT, "capture.log")
-BROWSER_CANDIDATES = ["/usr/bin/chromium", "/usr/bin/google-chrome-stable"]
+OUT_ROOT = paths.out_root()
+# 成品截图对外发布目录（Linux 上 ~/public 已由 Samba 共享；
+# Windows 上用 WEBCAPTURE_IMG_ROOT 指到想共享的目录）
+IMG_ROOT = paths.img_root()
+RAW_DIR = os.path.join(paths.state_dir(), ".raw")
+LOG = paths.log_path()
 VIEWPORT = {"width": 1440, "height": 900}
 
 # ── 动效冻结 ────────────────────────────────────────────────────────────────
@@ -265,9 +277,6 @@ async () => {
 # 本轮「第一次失败但重试后成功」的 URL，用于报警文案
 RETRIED = []
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import health  # noqa: E402  站点健康状态（连续失败计数 / 恢复判定）
-
 DEFAULT_FAIL_INTERVAL = 3600  # 连续失败时最小提醒间隔（秒），可被 notify.conf 覆盖
 
 
@@ -299,20 +308,20 @@ def host_slug(url):
     return re.sub(r"[^\w.\-]", "_", h) or "unknown"
 
 
-def find_browser():
-    for p in BROWSER_CANDIDATES:
-        if os.path.exists(p):
-            return p
-    return None
+def bundled_browser(p):
+    """Playwright 自带的 Chromium（`playwright install chromium` 装的那个）。
+
+    Windows 上很多人没装 Chrome，让 setup.ps1 下这个比要求装浏览器省事。
+    """
+    try:
+        exe = p.chromium.executable_path
+    except Exception:
+        return None
+    return exe if exe and os.path.exists(exe) else None
 
 
 def font(size):
-    for p in (
-        "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/liberation/LiberationSans-Bold.ttf",
-        "/usr/share/fonts/TTF/DejaVuSans.ttf",
-    ):
+    for p in paths.font_candidates():
         if os.path.exists(p):
             try:
                 return ImageFont.truetype(p, size)
@@ -322,7 +331,9 @@ def font(size):
 
 
 def add_watermark(src, dst, url, ts_text):
-    img = Image.open(src).convert("RGB")
+    # 必须显式关闭：Windows 上文件句柄没释放时，后面 os.replace(raw -> prev.png) 会失败
+    with Image.open(src) as _im:
+        img = _im.convert("RGB")
     w, h = img.size
     overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(overlay)
@@ -438,7 +449,20 @@ def freeze_motion(page, url):
     return rep
 
 
-PROFILE_DIR = os.path.expanduser("~/.cache/webcapture-profile")
+PROFILE_DIR = paths.profile_dir()
+
+
+def _clear_profile_locks():
+    """上一轮被 kill 掉时 profile 会留下锁文件；Windows 上还可能是目录。"""
+    for name in ("SingletonLock", "SingletonSocket", "SingletonCookie"):
+        p = os.path.join(PROFILE_DIR, name)
+        try:
+            if os.path.isdir(p) and not os.path.islink(p):
+                os.rmdir(p)
+            else:
+                os.remove(p)
+        except OSError:
+            pass
 
 
 def launch_ctx(p, exe):
@@ -451,17 +475,17 @@ def launch_ctx(p, exe):
     """
     os.makedirs(PROFILE_DIR, exist_ok=True)
     kw = dict(
-        executable_path=exe,
         headless=True,
         viewport=VIEWPORT,
         device_scale_factor=1,
         ignore_https_errors=True,
-        user_agent=("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"),
+        user_agent=paths.user_agent(),
         locale="zh-CN",
         args=["--no-sandbox", "--disable-dev-shm-usage", "--hide-scrollbars",
               "--disable-gpu", "--lang=zh-CN"],
     )
+    if exe:
+        kw["executable_path"] = exe
     ctx = None
     for attempt in range(2):
         try:
@@ -472,11 +496,7 @@ def launch_ctx(p, exe):
                 raise
             # 上一轮被 kill 掉时 profile 会留下锁文件，清掉再试一次
             log(f"PROFILE 复用失败（{type(e).__name__}: {str(e).splitlines()[0]}），清锁重试")
-            for name in ("SingletonLock", "SingletonSocket", "SingletonCookie"):
-                try:
-                    os.remove(os.path.join(PROFILE_DIR, name))
-                except OSError:
-                    pass
+            _clear_profile_locks()
     # 从文档创建起就挂钩定时器，才能在收尾时把它们一次清掉
     try:
         ctx.add_init_script(MOTION_INIT_JS)
@@ -780,28 +800,30 @@ def main():
     fail_interval = _conf_int(conf, "FAIL_ALERT_INTERVAL", DEFAULT_FAIL_INTERVAL)
     recover_on = _conf_int(conf, "ALERT_ON_RECOVER", 1)
 
-    exe = find_browser()
-    if not exe:
-        log("ERROR 找不到 chromium/chrome")
-        print("找不到浏览器", file=sys.stderr)
-        try:
-            st = health.on_fail("__browser__", "找不到 chromium/chrome", fail_interval)
-        except Exception:
-            st = {"action": "alert", "fail_count": 1}
-        if st.get("action") == "alert":
-            alert([("(启动失败)", "找不到 chromium/chrome", st)], [], [])
-        return 1
-    try:
-        if health.load("__browser__").get("fail_count"):
-            health.save("__browser__", {"fail_count": 0})
-    except Exception:
-        pass
-
+    exe = paths.find_browser()
     ok, fail = 0, 0
     fails, oks = [], []
     changed, recovered = [], []
     summary = []
     with sync_playwright() as p:
+        exe = exe or bundled_browser(p)
+        if not exe:
+            hint = paths.browser_hint()
+            log(f"ERROR {hint}")
+            print(hint, file=sys.stderr)
+            try:
+                st = health.on_fail("__browser__", hint, fail_interval)
+            except Exception:
+                st = {"action": "alert", "fail_count": 1}
+            if st.get("action") == "alert":
+                alert([("(启动失败)", hint, st)], [], [])
+            return 1
+        try:
+            if health.load("__browser__").get("fail_count"):
+                health.save("__browser__", {"fail_count": 0})
+        except Exception:
+            pass
+        log(f"BROWSER {exe}")
         ctx = launch_ctx(p, exe)
         try:
             for url in urls:

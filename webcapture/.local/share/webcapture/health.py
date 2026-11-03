@@ -17,8 +17,10 @@ import json
 import time
 from datetime import datetime
 
-OUT_ROOT = os.path.expanduser("~/webcapture")
-STATE_DIR = os.path.join(OUT_ROOT, "state")
+import paths
+
+OUT_ROOT = paths.out_root()
+STATE_DIR = paths.state_dir()
 DEFAULT_INTERVAL = 3600  # 连续失败时的最小提醒间隔（秒）
 
 

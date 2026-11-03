@@ -15,8 +15,10 @@ import hashlib
 import urllib.parse
 import urllib.request
 
-CONF = os.path.expanduser("~/webcapture/notify.conf")
-LOG = os.path.expanduser("~/webcapture/capture.log")
+import paths
+
+CONF = os.path.join(paths.out_root(), "notify.conf")
+LOG = paths.log_path()
 
 
 def log(msg):
@@ -69,7 +71,7 @@ def _clamp(text, limit_bytes):
     b = text.encode("utf-8")
     if len(b) <= limit_bytes:
         return text
-    tail = "\n\n…（内容过长已截断，完整信息见 ~/webcapture/capture.log）"
+    tail = f"\n\n…（内容过长已截断，完整信息见 {paths.log_path()}）"
     keep = limit_bytes - len(tail.encode())
     if keep < 32:
         return b[:max(0, limit_bytes)].decode("utf-8", "ignore")

@@ -13,3 +13,4 @@ cargo/.cargo/.package-cache-mutate
 .*~
 \#*#
 .#*
+__pycache__/

@@ -52,6 +52,7 @@
   "vim_mode": true,
   "agent": {
     "sandbox_permissions": {
+      "allow_unsandboxed": true,
       "network_hosts": [
         "pypi.org",
         "files.pythonhosted.org",

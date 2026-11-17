@@ -16,6 +16,7 @@
 | 时间水印 | 左上时间戳 + 斜向平铺水印 + 右下角时间条 |
 | 动效冻结 | 截图前把轮播、横向滚动、定时器全部复位，避免「假差异」 |
 | 内容变更报警 | 文本 sha256（主）+ 整页图逐像素（辅），附新增/删除行 |
+| 指定位置监控 | 按 CSS 选择器盯页面上某块内容（排队号这类），值变或满足 `<=10` 这类条件时单独推送 |
 | 失败报警 | 首次立刻报，之后默认每小时续报一次，不刷屏 |
 | 恢复通知 | 站点恢复时推一条「已恢复」，含中断时长 |
 | 产物发布 | 写到一个可被 SMB/共享访问的目录，`_latest/` 只有每个站最新一张 |
@@ -113,6 +114,10 @@ powershell -ExecutionPolicy Bypass -File .\shot.ps1 https://example.com/   # Win
 ```
 
 新增站点第一次跑只**建基线**，不报警（没有可比对象）。
+
+只想盯某个页面上的**一块内容**（排队号、等待人数），或者盯整页但排掉噪声区域，
+都不用加进 `DEFAULT_URLS`：写进 `$WEBCAPTURE_HOME/watch.conf` 即可，
+`main()` 会自动把那个 URL 并进本轮截图列表。详见 5.4。
 
 ### 4.2 填报警渠道
 
@@ -264,7 +269,80 @@ Windows 用用户级变量（计划任务会继承，改完要重新登录或重
 模板在 `compare.conf.example`，复制到 `$WEBCAPTURE_HOME/compare.conf` 再改。
 默认值已经能压住轮播、日期、列表轮转三类噪声，**没遇到新噪声就别动它**。
 
-### 5.4 改轮询间隔
+> 如果是「某一块区域每轮都变」（轮播图、广告位、访问量计数），别用 `IGNORE_REGEX` 逐行匹配，
+> 直接到 `watch.conf` 里写一条 `ignore = .carousel` —— 按 CSS 选择器排除，见 5.4。
+
+### 5.4 watch.conf —— 排队页监控（盯指定位置或整页）
+
+整页对比报的是「页面变了」，排队页上真正想知道的却是「叫到几号了」「前面还有几人」。
+让 `watch.py` 用 **CSS 选择器** 盯住页面上某块内容，值变了或满足条件时单独推一条；
+反过来也成立：不写 `selector` 就是盯整页，再用 `ignore` 把噪声区域排掉。
+
+配置在 `$WEBCAPTURE_HOME/watch.conf`（模板 `watch.conf.example`），用的是 INI 格式——
+`configparser` 是标准库，不用装 YAML/TOML 包：
+
+```ini
+[watch]
+alert_on_change = 1
+wait_ms = 3000
+
+# 节名 = 报警文案里的名字，也是状态文件里的键
+[当前叫号]
+url = https://example.com/queue/
+selector = #current-number
+
+[前面等待]
+url = https://example.com/queue/
+selector = .waiting-count
+when = <=10
+
+# 不写 selector = 监控整页
+[整页]
+url = https://example.com/news/
+
+# 整页监控 + 排除噪声区域
+[忽略轮播]
+url = https://example.com/queue/
+ignore = .carousel, .visitor-count
+```
+
+- `url` 必填，`selector` **可省**（省了就是监控整页文本），`when` 也可省（省了就是只看变化），
+  字段名大小写不敏感。
+- **一个节就是一个监控点**，有没有 `selector` 都一样；`selector` 只是把范围缩到一块。
+- `ignore` 可选：读整页文本前先隐藏这些区域。值整串交给 `querySelectorAll`，逗号组合、`:is()`、
+  后代/子/相邻组合器（`.list > li + li`）都能写；写长了可换行，但续行必须缩进。
+  它只影响文本对比，**不影响**同节 `selector` 的取值，也不会隐藏截图上的内容。
+- 同一个 URL 写多个节 = 盯多个位置；改动选择器不会丢历史，改节名则算新监控点。
+- URL 写在这里就**不用**再改 `capture.py` 的 `DEFAULT_URLS`，会自动并入每轮截图列表。
+- `when` 支持 `<= < >= > == != =`，取文本里第一个数字比较；`==` / `!=` 右边非数字时按文本比。
+  条件只在「不满足 → 满足」时提醒**一次**，之后保持满足不重复。
+- 行内不要写 `#` 注释，会被当成值的一部分；旧的竖线写法仍能读，但不建议新写。
+
+`[watch]` 段（也可写 `[global]`）的全局开关：
+
+| 键 | 默认 | 含义 |
+|---|---|---|
+| `alert_on_change` | 1 | 文本变了就报（整页、元素规则都一样） |
+| `alert_on_first` | 0 | 首次取值（建基线）是否也报 |
+| `wait_ms` | 3000 | 等元素出现的上限（毫秒），0 = 不等 |
+| `skip_compare_alert` | 1 | 该 URL 有监控点时不再发整页变更报警；含图像报警，要保留就设 0 |
+
+**整页规则（`selector` 省略）的两点差异**：
+
+- 取值会先过 `compare.py` 的同一套归一化（丢时钟/页码行、剥行首日期），也复用「只是换顺序
+  不报警」的判定，所以整页规则不会因时钟或轮播列表轮转刷屏。
+- 报警文案只给**行级摘要**（`文本 +N/-M 行` 加前几行增删），不会把整页原文塞进消息；
+  同时它会按 `skip_compare_alert` 抑制 `compare.py` 的整页报警，避免一轮两条。
+
+建议：排队号每轮都在变，想安静点就把 `alert_on_change` 设 `0`，只留每个节的 `when`。
+整页监控想排除轮播/广告位这类噪声，写一条 `ignore = .carousel, .visitor-count` 即可
+（比 `compare.conf` 的 `IGNORE_REGEX` 逐行匹配稳，页面改版只需改选择器）。
+取值存 `state/<域名>.watch.json`，删掉即重建基线；选择器没匹配到日志会出 `WATCH-WARN`。
+配置本身写错（比如两个同名节）会在 `capture.log` 里报 `WATCH` 异常，不会静默失效。
+
+> 采样跟着截图轮次走（默认 15 分钟一次），**不是常驻轮询**。要更高频就改下一节的间隔。
+
+### 5.5 改轮询间隔
 
 **Linux** —— 改 `~/.config/systemd/user/webcapture.timer` 的 `OnCalendar`
 （**注释必须独占一行**，systemd 不认行尾 `#`，写在值后面会让 timer 解析失败）：
@@ -336,6 +414,7 @@ FAIL   https://www.bjydf.cn/  Timeout ... | 连续第 1 次 | 已报警
 <IMG_ROOT>/_diffs/<域名>/<时间>.png          红框标出变化区域的差异图
 <WEBCAPTURE_HOME>/state/<域名>.{json,txt,prev.png}   基线
 <WEBCAPTURE_HOME>/state/<域名>.health.json           连续失败计数
+<WEBCAPTURE_HOME>/state/<域名>.watch.json            监控点上轮取值与条件命中状态
 <WEBCAPTURE_HOME>/capture.log / run.out              日志
 ```
 
@@ -475,6 +554,7 @@ Windows 上对应「上次运行结果」`0x2` / `0x1` / `0x3`。
 | 定时任务到点不跑 | Linux：`list-timers` 看 NEXT、`loginctl` 看 linger；Windows：任务必须用户已登录 |
 | 截图大量空白格（首轮） | 冷缓存，跑两轮就稳定；仍空则查网络/代理 |
 | 每轮都报同一个站点的变更 | 先看 `capture.log` 的 `CHANGE` 行确认是否真变；确属噪声再加 `IGNORE_REGEX` / 开 `STRIP_DATE_PREFIX` / 开 `IGNORE_REORDER` |
+| 设置了 `watch.conf` 但没收到监控报警 | 看日志 `WATCH-BASE`（首次只建基线）与 `WATCH-WARN`（选择器没匹配到）；也确认该 URL 本身没截图失败 |
 | 报警频繁但网页没变 | 看 `_diffs/` 红框图；多半是轮播/滚动，确认 `WEB_FREEZE_MOTION=1` |
 | 钉钉返回 `310000 关键词不匹配` | `DINGTALK_KEYWORD` 与机器人安全设置不一致 |
 | 钉钉消息挤成一行 / 符号变圆点 | 钉钉 markdown 只支持有限语法，本项目的分段格式已适配；不要自行删掉空行 |
@@ -494,7 +574,17 @@ Windows 上对应「上次运行结果」`0x2` / `0x1` / `0x3`。
 - **动效冻结**是必要的，不是可选优化：同一站点两轮之间，轮播能让整页差异到 14%+，
   冻结后稳定在 0.02%–0.05%。
 - **用系统浏览器**而不是 Playwright 自带 Chromium：省 150MB，且和用户实际看到的渲染一致。
+- **监控点取值在动效冻结之后、打水印之前**：这样拿到的是归档截图里那块内容，而且排队号
+  不会因为轮播/自动刷新在两个时机取到不同值。同理，等元素只能用 Python 侧轮询
+  而不能用 `page.wait_for_function` —— 冻结已经把页面的 `setTimeout` / `rAF` 换成了空实现。
+- **有监控点的 URL 默认不再发整页变更报警**：排队号每轮都变，两路都报就是一轮两条。
+  想都报就 `skip_compare_alert = 0`。
+- **监控配置用 INI 而不用 YAML/TOML**：YAML 的 `#` 会吃掉 `selector: #id` 的值（CSS id
+  选择器全以 # 开头），TOML 的 `tomllib` 又要 3.11+；INI 的 `configparser` 是标准库且值不转义。
+- **状态按节名做键而不是选择器**：网站改版换了个选择器时，历史值还能接上，不会莫名重建基线。
+- **监控点是采样而非轮询**：跟着截图轮次跑（默认 15 分钟），不做常驻 watcher，
+  保持单进程、无额外内存和反爬风险。
 
 ---
 
-*最后更新：2026-11-03*
+*最后更新：2026-11-17*

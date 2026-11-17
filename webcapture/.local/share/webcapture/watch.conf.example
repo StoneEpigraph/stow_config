@@ -1,0 +1,61 @@
+# 页面监控：盯页面上的一块内容（排队号这类），或不写选择器直接盯整页
+# 正式文件：~/webcapture/watch.conf（本文件只是模板，不建就不监控任何页面）
+#
+# 用的是 INI 格式，Python 自带的 configparser 就能读，不用装 YAML/TOML 库：
+#   [watch]          全局开关（也可以用 [global]）
+#   [随便起个名字]    一个监控点，**节名就是报警文案里显示的名字**
+#       url      = 页面地址（必填）
+#       selector = CSS 选择器（**可省**；不写就是监控整页）#id、.class、div > span 都行，不需要转义
+#       when     = 可选，满足条件时额外提醒一次（<=10、==可预约 …）
+#       ignore   = 可选，读整页文本前把这些位置藏掉（不影响上面 selector 的取值）
+#
+# 一个节就是一个监控点：写了 selector 只盯那一块，不写就盯整页。
+# 所以「整页 + 排除噪声区域」只写 url + ignore 两行即可。
+# ignore 的值会原样交给 querySelectorAll，所以逗号组合、:is(...) 都能写，不会被拆断；
+# 写太长可以续行，但续行必须缩进（会拼到上一行，中间算一个空格）。
+# 同一个 url 写多个节，就是盯它页面上的多个位置。
+# 这个 URL 不用另外加进 capture.py 的 DEFAULT_URLS，会自动并入每轮截图列表。
+# 改完不用重启，下一轮就读新配置；改了节名等于换了身份，会重新建基线（不报警）。
+#
+# 千万别在 [节] 里写行内注释：`url = https://a.com/  # 备注` 会把 # 后面也当成 URL。
+
+[watch]
+# 值变了就报。排队号每 15 分钟基本都在变，想安静点设 0，改用每节的 when
+alert_on_change = 1
+# 第一次看到该位置（建基线）不报，避免刚配好就发一条
+alert_on_first = 0
+# 等元素出现的最长时间（毫秒）；0 = 不等，直接取
+wait_ms = 3000
+# 该 URL 有监控点时，跳过「整页文本变更」报警（否则排队号一变就刷一条整页变更）
+# 想让两者都报就设 0。注意：设 1 时连 ALERT_ON_IMAGE_CHANGE 的告警也会一起抑制。
+skip_compare_alert = 1
+
+# ── 例子（要用就把每行开头的 ; 去掉）─────────────────────────────
+; [当前叫号]
+; url = https://example.com/queue/
+; selector = #current-number
+;
+; [前面等待]
+; url = https://example.com/queue/
+; selector = .waiting-count
+; when = <=10
+;
+; [预约状态]
+; url = https://example.com/booking/
+; selector = .status-box
+; when = ==可预约
+;
+; [忽略轮播和访问量]
+; url = https://example.com/queue/
+; ignore = .carousel, .visitor-count, .ad-slot
+# ↑ 这一节没写 selector，所以是整页监控：除了这几块，其它文字变化都会报
+;
+; [整页监控]
+; url = https://example.com/news/
+;
+# 上面那条 ignore 和下面这条是同一个意思的两种写法（一行 vs 续行），二选一
+; [忽略轮播（续行写法）]
+; url = https://example.com/queue/
+; ignore = .carousel,
+;          .visitor-count,
+;          ul.list > li:nth-child(2)

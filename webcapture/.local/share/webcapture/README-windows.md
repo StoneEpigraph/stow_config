@@ -3,8 +3,8 @@
 > 完整操作手册（Linux + Windows 并列）见 [USAGE.md](USAGE.md)；
 > 本文件只讲 Windows 特有的前置、差异和排障。
 
-Windows 与 Linux **共用同一份 Python 逻辑**（`capture.py` / `compare.py` / `health.py` / `notify.py`），
-只把「入口」换掉：
+Windows 与 Linux **共用同一份 Python 逻辑**（`capture.py` / `compare.py` / `health.py` / `notify.py` /
+`paths.py` / `watch.py`），只把「入口」换掉：
 
 | Linux | Windows |
 |---|---|
@@ -17,6 +17,8 @@ Windows 与 Linux **共用同一份 Python 逻辑**（`capture.py` / `compare.py
 | DejaVu 字体、Linux UA | 微软雅黑、Windows UA |
 
 截图、水印、动效冻结、文本/图像变更检测、钉钉/企业微信报警、失败降频与恢复通知，行为与 Linux 版完全一致。
+按 CSS 选择器盯页面指定位置（排队号等），或者不写选择器直接盯整页、用 `ignore` 排掉噪声区域，
+行为都与 Linux 版完全一致，配置在 `%USERPROFILE%\webcapture\watch.conf`。
 
 ---
 
@@ -43,7 +45,7 @@ git clone git@github.com:StoneEpigraph/stow_config.git $env:USERPROFILE\stow_con
 
 cd $env:USERPROFILE\stow_config\webcapture\.local\share\webcapture
 
-# 建 venv、装 playwright/pillow、检查浏览器、生成 notify.conf
+# 建 venv、装 playwright/pillow、检查浏览器、生成 notify.conf / watch.conf
 powershell -ExecutionPolicy Bypass -File .\setup.ps1
 
 # 没有 Chrome/Edge 时加 -InstallBrowser（下载约 150MB）
@@ -140,10 +142,17 @@ powershell -ExecutionPolicy Bypass -File .\uninstall-task.ps1
 > 改完要重新登录（或重启），计划任务才会拿到新环境变量；
 > 手动跑 `shot.ps1` 时新开的 PowerShell 窗口即可生效。
 
-报警降频和变更检测的开关仍在两个配置文件里，键名和 Linux 版完全一样：
+报警降频、变更检测和页面指定位置监控的开关都在配置文件里，键名和 Linux 版完全一样：
 
 - `%USERPROFILE%\webcapture\notify.conf`：`FAIL_ALERT_INTERVAL`、`ALERT_ON_RECOVER`
 - `%USERPROFILE%\webcapture\compare.conf`：`ALERT_ON_TEXT_CHANGE`、`IGNORE_REGEX` 等
+- `%USERPROFILE%\webcapture\watch.conf`：INI 格式，`[watch]` 段放
+  `alert_on_change` / `wait_ms` / `skip_compare_alert`；其余每节一个监控点，
+  `url` 必填，`selector` / `when` / `ignore` 可选 —— 不写 `selector` 就是监控整页
+
+`setup.ps1` 会把 `notify.conf` 与 `watch.conf` 的 `.example` 复制成正式文件（已存在就跳过），
+`compare.conf` 可选，需要改阈值时手动复制。`watch.conf` 的写法见
+[README.md](README.md) 的「排队页监控」一节；改完不用重启计划任务，下一轮就读新配置。
 
 ---
 
@@ -183,6 +192,7 @@ Remove-SmbShare -Name webcapture
 | 任务不跑 | 该任务只在**当前用户登录后**运行；`Get-ScheduledTaskInfo` 看 `LastRunTime` |
 | 中文变乱码 | 脚本已强制 UTF-8；手动看日志用 `Get-Content "$env:USERPROFILE\webcapture\run.out" -Encoding UTF8` |
 | `PROFILE 复用失败 ... 清锁重试` | 上一轮被强杀留下的锁；脚本会自动清，仍失败就删 `%LOCALAPPDATA%\webcapture\profile` |
+| 日志里 `WATCH-WARN ... 选择器未匹配` | 选择器没匹配到内容：用浏览器 DevTools 重查；页面要点击/切换后才出现的内容，靠 `wait_ms` 也等不到 |
 | 首次跑截图里大量空白格 | 持久 profile 首次是冷缓存，跑两轮后稳定（与 Linux 版同因） |
 | 脚本被策略拦住 | 命令里加 `-ExecutionPolicy Bypass`，或 `Unblock-File .\*.ps1` |
 | 想看详细日志 | `Get-Content "$env:USERPROFILE\webcapture\capture.log" -Tail 50 -Encoding UTF8` |

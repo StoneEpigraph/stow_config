@@ -37,5 +37,9 @@ if [ ! -f "$HOME/webcapture/notify.conf" ] && [ -f "$BASE/notify.conf.example" ]
   chmod 600 "$HOME/webcapture/notify.conf"
   echo "==> 已生成 ~/webcapture/notify.conf（填 webhook 才会发报警）"
 fi
+if [ ! -f "$HOME/webcapture/watch.conf" ] && [ -f "$BASE/watch.conf.example" ]; then
+  cp "$BASE/watch.conf.example" "$HOME/webcapture/watch.conf"
+  echo "==> 已生成 ~/webcapture/watch.conf（默认没有监控点，按需取消注释）"
+fi
 
 echo "==> 完成。试跑一轮： $BASE/shot.sh"

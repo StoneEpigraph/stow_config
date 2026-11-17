@@ -127,3 +127,64 @@
 - **隐患**：`~/.config/niri` 目录**属主是 root**、且**未纳入 stow** → 改了本机也同步不到 ThinkBook；
   建议把 niri 配置也 stow 化，并在 ThinkBook 单独跑脚本或手动加启动行。
 - 为何 KDE 不换 dunst：双守护同活会让应用发通知卡 60s；且会丢 KDE 通知中心（铃铛/历史/操作按钮/勿扰/锁屏）。
+
+## stow 包：webcapture（2026-10-21 建）
+- 网页定时整页截图 + 时间水印 + 失败报警，`systemd --user` timer 每 15 分钟跑。
+- 包内：`.local/share/webcapture/`（capture.py / shot.sh / notify.py / setup.sh / README.md / notify.conf.example）+
+  `.config/systemd/user/webcapture.{service,timer}`（ExecStart 用 `%h`）。
+- **`notify.conf` 不进仓库**（含 webhook 密钥），固定在 `~/webcapture/notify.conf`，权限 600。
+- 新机器：`git pull` → `stow --no-folding webcapture` → `~/.local/share/webcapture/setup.sh` →
+  `systemctl --user daemon-reload && systemctl --user enable --now webcapture.timer`。
+- 注意：只 stow 包不够，**每台机器都要跑 setup.sh** 建 venv（依赖不跟着 stow 走）。
+- 变更检测：`compare.py` —— 文本 `innerText` 归一化哈希（主信号）+ 裸图逐像素差异（辅）。
+  **差异必须用打水印前的裸图**（水印每轮变会污染 diff），裸图只留一张 `state/<host>.prev.png`。
+  轮播图页码 `1/5` 是最大噪声，`IGNORE_REGEX` 默认已滤。配置 `~/webcapture/compare.conf`。
+  第二大噪声是 bjyouth.gov.cn 顶栏日期：由 `window.onload` 填 `#currentDate`，等第三方脚本
+  （百度统计、`dcs.conac.cn`）拖到 2~20s+ 甚至整轮不填 → 文本在「有/无日期」间跳变。
+  `STRIP_DATE_PREFIX=1` 剥行首日期前缀兜底，`WEB_DATE_WAIT_MS`（默认 6s）先等填充。
+  规则只能剥「日期后面还有内容」的行 —— bjjdzx 正文有「整行只有一个日期」的条目，剥空会误报。
+- **动效冻结**（2026-10-25，`freeze_motion()`）：截图前横向滚动归零、轮播回第 1 张、定时器冻住，
+  否则假差异 14%~17%。两个必须记住的点：复位要在**冻结之后**再做一次；`left` 复位必须同时
+  `transition: none`（否则 `animations="disabled"` 会把过渡快进回原幻灯片）。图像差异降到 0.02~0.05%。
+- 浏览器用**持久 profile** `~/.cache/webcapture-profile` 复用 HTTP 缓存（否则 bjjdzx 96 张图来不及下、一片空白）；
+  `--disk-cache-dir` 参数无效，必须 `launch_persistent_context`。**同一 profile 不能被两个进程同用**，
+  所以手动测试也要走 `shot.sh`（有 flock），别直接 `python capture.py`。
+- 报警策略：`health.py` + `state/<host>.health.json` —— 首次失败立即报，持续失败按
+  `FAIL_ALERT_INTERVAL`（默认 3600s）续报，恢复时发一条「已恢复」并清零。配置在 `~/webcapture/notify.conf`。
+- 产物：成品图与差异图在 **`~/public/webcapture/`**（域名/日期/时分秒.png、`_diffs/`），
+  经本机已有的 Samba `[public]` 共享（匿名可读，`read only = no`）→ `\\10.168.1.152\public\webcapture`。
+  日志/state/基线留在 `~/webcapture/`，不对外。
+- `_latest/` 是每站最新一张的**硬链接**（固定名 `<域名>.png`）+ `SUMMARY.txt`（最后成功时间/本轮结果）。
+  **SMB 下不要用软链做这种入口**，Windows 常打不开；硬链接才稳。
+
+## 沙箱内的文件安全（2026-10-22 踩过坑）
+- **沙箱 uid 映射是 `0 → 1000`**：`id` 显示 root，`ls` 显示 `root:root`，实际就是宿主 stone。
+  别把「属主 root」当成权限问题去修，先看 `/proc/self/uid_map`。
+- **`/tmp` 是 10M tmpfs，且跨工具调用会被清空** → 临时备份绝不能放 `/tmp`，否则等于没备份。
+  要临时备份就放 `~/.cache/` 下，或先 `cp` 到同目录加 `.bak` 后缀。
+- 覆盖密钥类文件前，**先在仓库外的固定位置留一份**（如 `~/.cache/webcapture/notify.conf.bak`）。
+- 误删/误覆盖后可以尝试找回：WorkBuddy 自己会留历史——
+  `~/.workbuddy/workspace/sessions/<sid>/modify_backup/`（编辑前快照）与
+  `~/.workbuddy/file-history/<sid>/`（文件版本），常常能捞回完整原文。
+  2026-10-22 就是靠 `modify_backup/*.notify.conf` 找回了钉钉 webhook。
+
+## systemd user timer 的开机行为（排查套路）
+- 判断「重启后还会不会跑」查三样：`timers.target.wants/` 有无软链（enable）、
+  `loginctl show-user <u> | grep Linger`、以及 `~/.local/share/systemd/timers/stamp-*.timer`（Persistent）。
+- user 的 `basic.target` 里 `Wants=sockets.target timers.target paths.target` → 登录即拉起 timer，
+  **改单元后只要 daemon-reload 过，重启不需要额外操作**。
+- `Linger=no` + 无自动登录 = 停在登录界面就不跑。`sudo loginctl enable-linger <u>` 可解决。
+- user 实例里 `After=network-online.target` **是空实现**，开机补跑那轮常没网，
+  脚本里要自己等网络（本机用 `nmcli -t -f STATE general` = `connected`）。
+
+## Ghostty 配置（1.4.0，2026-11-03 实测）
+- **只认两个文件名**：`~/.config/ghostty/config` 与 `~/.config/ghostty/config.ghostty`。
+  `zz.ghostty`、`config.ghostty.bak` 之类**不会被加载**（探针法：塞 `font-family = PROBE_X` 再看 `+show-config`）。
+- 没配置时 1.4 自建模板就名叫 `config.ghostty`（旧版叫 `config`）。所以磁盘上可能同时有两个，都有效。
+- **绝对不要**把 `ghostty +show-config --default --docs` 的输出贴进配置文件（Ghostty 模板里自己也这么写：
+  默认值写进配置会互相冲突）。典型后果：默认的 command-palette-entry 里有 `action:open_config`，
+  它在**命令面板**里解析失败 → `command-palette-entry: invalid value ...`；但作为 **keybind** 动作是合法的。
+- 排查配置报错最快的办法：`ghostty +validate-config --config-file=/path/to/config`（静默 = 通过）。
+  查生效值 `ghostty +show-config`，列动作 `ghostty +list-actions`。
+- 配置由 stow 包 `ghostty` 管理（`~/stow_config/ghostty/.config/ghostty/config`），已 `stow --no-folding` 链接。
+

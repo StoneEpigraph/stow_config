@@ -23,6 +23,7 @@ from PIL import Image, ImageDraw, ImageFont
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import health  # noqa: E402  站点健康状态（连续失败计数 / 恢复判定）
 import paths   # noqa: E402  Linux / Windows 路径与外部依赖探测
+import watch   # noqa: E402  页面指定位置（CSS 选择器）监控
 
 # Windows 的控制台和重定向默认不是 UTF-8，报警文案里的 emoji 会直接把进程打挂。
 # 这里统一成 UTF-8：Linux 上行为不变，Windows 下无论计划任务还是 cmd 都不会崩。
@@ -542,6 +543,65 @@ def _unstable_reason(prev, w, h, text):
     return "，".join(reasons)
 
 
+def _page_text(url, page):
+    """取整页文本（对比用）。
+
+    watch.conf 里给这个 URL 配了 ignore 时，先把那些位置临时隐藏再读 innerText：
+    轮播、广告位、访问量这类噪声用 CSS 选择器排除，比 compare.conf 的
+    IGNORE_REGEX 逐行匹配稳得多（文案一换就得改正则，选择器不用改）。
+    选在截图之后调，所以隐藏不会影响归档图。
+    """
+    try:
+        sels = watch.ignore_selectors(url)
+    except Exception as e:
+        sels = []
+        log(f"IGNORE 读取配置失败 {url}: {type(e).__name__}: {str(e).splitlines()[0]}")
+    if sels:
+        log(f"IGNORE {url} 整页对比忽略 {len(sels)} 条选择器：" + "；".join(sels))
+    try:
+        return watch.body_text(page, sels)
+    except Exception as e:
+        log(f"TEXT 取整页文本失败 {url}: {type(e).__name__}: {str(e).splitlines()[0]}")
+        return ""
+
+
+def _watch_page(url, page):
+    """抓取 watch.conf 里该 URL 指定的元素内容，并做变化 / 条件判定。
+
+    放在截图之后、打水印之前：这时页面已经稳定（懒加载和轮播都冻住了），
+    取到的就是归档截图里那块内容。
+    """
+    try:
+        if not watch.has_rules(url):
+            return None
+        res = watch.check(host_slug(url), url, page)
+    except Exception as e:
+        log(f"WATCH 跳过 {url}: {type(e).__name__}: {str(e).splitlines()[0]}")
+        return None
+    if not res:
+        return None
+    for b in res.get("baseline") or []:
+        if b.get("whole"):
+            log(f"WATCH-BASE {url} {b['label']} = 整页文本 "
+                f"{len(str(b['new']).splitlines())} 行")
+        else:
+            log(f"WATCH-BASE {url} {b['label']} = {b['new']}")
+    for m in res.get("missing") or []:
+        extra = f"（{m['error']}）" if m.get("error") else ""
+        log(f"WATCH-WARN {url} 选择器未匹配到内容：{m['selector']}（{m['label']}）{extra}")
+    for c in res.get("changes") or []:
+        if c.get("whole"):
+            log(f"WATCH {url} {c['label']} 整页文本 "
+                f"+{c.get('added_n', 0)}/-{c.get('removed_n', 0)} 行")
+            for s in c.get("added") or []:
+                log(f"WATCH   +{s[:80]}")
+            for s in c.get("removed") or []:
+                log(f"WATCH   -{s[:80]}")
+        else:
+            log(f"WATCH {url} {c['label']} {c.get('old')} -> {c['new']}")
+    return res
+
+
 def shoot(ctx, url, allow_retry=True):
     now = datetime.now()
     ts_text = f"{now:%Y-%m-%d %H:%M:%S}"
@@ -561,7 +621,7 @@ def shoot(ctx, url, allow_retry=True):
                 last_err = f"{type(e).__name__}: {str(e).splitlines()[0]}"
                 log(f"RETRY {url} 第{attempt + 1}次失败: {last_err}")
                 if attempt == 1:
-                    return None, 0, 0, last_err, None
+                    return None, 0, 0, last_err, None, None
                 RETRIED.append(url)
                 try:
                     page.close()
@@ -619,10 +679,7 @@ def shoot(ctx, url, allow_retry=True):
         raw = os.path.join(RAW_DIR, f".tmp-{host_slug(url)}.png")
         os.makedirs(RAW_DIR, exist_ok=True)
         page.screenshot(path=raw, full_page=True, animations="disabled", caret="hide")
-        try:
-            page_text = page.evaluate("document.body.innerText") or ""
-        except Exception:
-            page_text = ""
+        page_text = _page_text(url, page)
 
         # 渲染完整性自检：整页尺寸或文本量相对上一轮骤减，基本就是这轮没渲染全
         # （图片/脚本还没就绪），不重抓就会变成一条「网站删了一堆内容」的假报警。
@@ -641,6 +698,7 @@ def shoot(ctx, url, allow_retry=True):
                     pass
                 return shoot(ctx, url, allow_retry=False)
 
+        watched = _watch_page(url, page)
         w, hgt = add_watermark(raw, out, url, ts_text)
 
         info = None
@@ -650,9 +708,9 @@ def shoot(ctx, url, allow_retry=True):
             info = compare.check(host_slug(url), raw, page_text, url)
         except Exception as e:
             log(f"COMPARE 跳过 {url}: {e}")
-        return out, w, hgt, None, info
+        return out, w, hgt, None, info, watched
     except Exception as e:
-        return None, 0, 0, f"{type(e).__name__}: {e}", None
+        return None, 0, 0, f"{type(e).__name__}: {e}", None, None
     finally:
         try:
             page.close()
@@ -793,9 +851,37 @@ def alert_changes(changed, total):
         log(f"NOTIFY 发送异常: {e}")
 
 
+def alert_watch(results):
+    """监控点有变化或条件命中时推送。"""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import notify
+    except Exception as e:
+        log(f"NOTIFY 模块加载失败: {e}")
+        return
+    ts = f"{datetime.now():%Y-%m-%d %H:%M:%S}"
+    title, text = watch.format_message(ts, results)
+    try:
+        res = notify.send(title, text)
+        print(f"watch alert -> {res}")
+    except Exception as e:
+        log(f"NOTIFY 发送异常: {e}")
+
+
 def main():
-    urls = sys.argv[1:] or DEFAULT_URLS
+    urls = list(sys.argv[1:] or DEFAULT_URLS)
     del RETRIED[:]
+
+    # watch.conf 里的 URL 自动并入本轮截图列表，不用再改 DEFAULT_URLS
+    try:
+        extra = watch.urls_not_in(urls)
+    except Exception as e:
+        extra = []
+        log(f"WATCH 读取配置失败: {e}")
+    if extra:
+        urls += extra
+        log("WATCH 追加监控 URL：" + "、".join(extra))
+
     conf = notify_conf()
     fail_interval = _conf_int(conf, "FAIL_ALERT_INTERVAL", DEFAULT_FAIL_INTERVAL)
     recover_on = _conf_int(conf, "ALERT_ON_RECOVER", 1)
@@ -804,6 +890,7 @@ def main():
     ok, fail = 0, 0
     fails, oks = [], []
     changed, recovered = [], []
+    watched_changes = []
     summary = []
     with sync_playwright() as p:
         exe = exe or bundled_browser(p)
@@ -828,7 +915,7 @@ def main():
         try:
             for url in urls:
                 slug = host_slug(url)
-                out, w, hgt, err, info = shoot(ctx, url)
+                out, w, hgt, err, info, watched = shoot(ctx, url)
                 if out:
                     ok += 1
                     oks.append(slug)
@@ -848,6 +935,8 @@ def main():
                             f"中断 {health.fmt_dur(rec['seconds'])}")
                     if info:
                         _report_change(url, info, changed)
+                    if watched and watched.get("changes"):
+                        watched_changes.append(watched)
                 else:
                     fail += 1
                     try:
@@ -871,6 +960,8 @@ def main():
         alert(fails, oks, RETRIED)
     if changed:
         alert_changes(changed, len(urls))
+    if watched_changes:
+        alert_watch(watched_changes)
     if recovered:
         if recover_on:
             alert_recovered(recovered, len(urls))
@@ -903,8 +994,17 @@ def _report_change(url, info, bucket):
     if bits:
         log(f"CHANGE {url} " + "，".join(bits))
         print(f"CHG  {url}  " + "，".join(bits))
-    if compare.should_alert(info):
-        bucket.append(info)
+    if not compare.should_alert(info):
+        return
+    # 这个 URL 已经在 watch.conf 里盯了具体位置，整页文本变化就不再单独报——
+    # 排队号每轮都在变，否则一轮两条报警。想都报就在 watch.conf 里设 skip_compare_alert = 0。
+    try:
+        if watch.should_suppress_compare(url):
+            log(f"WATCH {url} 已按选择器监控，跳过整页变更报警")
+            return
+    except Exception:
+        pass
+    bucket.append(info)
 
 
 if __name__ == "__main__":

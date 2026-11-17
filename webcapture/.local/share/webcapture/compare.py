@@ -128,6 +128,31 @@ def text_diff(old_text, new_text, max_lines=None):
     return added, removed, len(added), len(removed)
 
 
+def diff_change(old_text, new_text, max_lines=None):
+    """文本变化判定，返回 dict（总是含 added/removed/added_n/removed_n）。
+
+    「只是换了顺序」的情况标 reordered：删掉的行和新增的行内容完全相同、只是位置不同
+    （横向滚动列表每轮把第一个条目轮转到末尾），画面其实一个字没变，不应该报警。
+    这些行不只在 compare.check 里用，watch.py 的「整页监控」也得用同一套口径。
+    """
+    added, removed, an, rn = text_diff(old_text, new_text)
+    res = {
+        "added": added[:max_lines] if max_lines else added,
+        "removed": removed[:max_lines] if max_lines else removed,
+        "added_n": an,
+        "removed_n": rn,
+    }
+    if not an and not rn:
+        return res
+    if sorted(added) == sorted(removed) and load_conf().get("IGNORE_REORDER", "1") != "0":
+        res["reordered"] = True
+        res["reorder_rows"] = an
+        res["added"], res["removed"] = [], []
+    else:
+        res["text_changed"] = True
+    return res
+
+
 def image_diff(prev_path, cur_path, out_path=None, threshold_pixel=25, save_min_ratio=0.003):
     """对齐到相同宽度与较小高度做逐像素比较。返回变化像素占比。"""
     if not (os.path.exists(prev_path) and os.path.exists(cur_path)):
@@ -212,18 +237,7 @@ def check(host, raw_png, page_text, url):
             except Exception:
                 pass
         max_n = int(conf.get("MAX_SNIPPET_LINES", "6"))
-        a_full, r_full, an, rn = text_diff(old_text, text)
-        # 「只是换了顺序」：删掉的行和新增的行内容完全相同（只是位置不同）。
-        # bjjdzx 的横向滚动列表会把第一个 li 轮转到末尾，DOM 顺序变了一格 →
-        # 报警说「+LSD / -LSD」，而截图 0.00% 差异、网页一个字没改。
-        if (an or rn) and sorted(a_full) == sorted(r_full) \
-                and conf.get("IGNORE_REORDER", "1") != "0":
-            info["reordered"] = True
-            info["reorder_rows"] = an
-        else:
-            info["text_changed"] = True
-            info.update(added=a_full[:max_n], removed=r_full[:max_n],
-                        added_n=an, removed_n=rn)
+        info.update(diff_change(old_text, text, max_n))
 
     # ---- 写回状态 ----
     try:

@@ -129,6 +129,14 @@ try {
         Write-Info "已存在 $conf"
     }
 
+    # ---- 5b) watch.conf（页面指定位置监控，默认没有监控点）-------------------
+    $watchConf = Join-Path $StateDir 'watch.conf'
+    $watchExample = Join-Path $AppDir 'watch.conf.example'
+    if (-not (Test-Path -LiteralPath $watchConf) -and (Test-Path -LiteralPath $watchExample)) {
+        Copy-Item -LiteralPath $watchExample -Destination $watchConf
+        Write-Info "已生成 $watchConf（默认没有监控点，按需取消注释）"
+    }
+
     # ---- 6) 可选：注册计划任务 ------------------------------------------------
     if ($RegisterTask) {
         Write-Step '注册计划任务'

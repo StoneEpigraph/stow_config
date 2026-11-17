@@ -1,5 +1,6 @@
 # 密钥与缓存，绝不入库
 notify.conf
 compare.conf
+watch.conf
 __pycache__/
 *.pyc

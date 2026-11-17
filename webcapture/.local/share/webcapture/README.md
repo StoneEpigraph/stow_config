@@ -1,7 +1,8 @@
 # webcapture —— 网页定时整页截图 + 时间水印 + 失败报警 + 恢复通知
 
 每 15 分钟对固定几个网址整页截图，图上打时间水印；请求失败推送到钉钉/企业微信群机器人，
-站点恢复正常时再推一条「已恢复」，形成闭环。
+站点恢复正常时再推一条「已恢复」，形成闭环。另可用 CSS 选择器盯页面上某个位置（比如排队号），
+值变化或满足条件时单独提醒。
 
 > **先看操作手册**：[USAGE.md](USAGE.md) —— 安装、配置、运维、排障，Linux 与 Windows 并列。
 > 本文件是 Linux 侧的设计细节与踩坑记录；Windows 差异补充见 [README-windows.md](README-windows.md)。
@@ -19,6 +20,9 @@ systemctl --user list-timers webcapture.timer
 
 `notify.conf` 不在仓库里（含密钥），放在 `~/webcapture/notify.conf`，需要报警就按
 `notify.conf.example` 填 webhook，然后 `python3 ~/.local/share/webcapture/notify.py --test`。
+
+另外两份可选的配置：`watch.conf` 由 `setup.sh` 从同名 `.example` 复制（页面指定位置监控，见下文），
+`compare.conf` 只在需要调阈值时手动复制 `compare.conf.example`。
 
 ## 报警怎么配
 
@@ -105,11 +109,13 @@ loginctl show-user stone | grep Linger     # 应显示 Linger=yes
 |---|---|
 | `.local/share/webcapture/capture.py` | Playwright 整页截图 + Pillow 打水印 |
 | `.local/share/webcapture/compare.py` | 变更检测：文本哈希 + 整页图差异 |
+| `.local/share/webcapture/watch.py` | 页面监控：按 CSS 选择器盯一块内容，或盯整页并排掉指定区域 |
+| `.local/share/webcapture/watch.conf.example` | 监控配置模板（`setup` 会复制成 `~/webcapture/watch.conf`） |
 | `.local/share/webcapture/shot.sh` | 入口：找解释器、flock 防重叠、日志、清理 |
 | `.local/share/webcapture/notify.py` | 钉钉/企业微信 webhook 报警 |
 | `.local/share/webcapture/health.py` | 站点健康状态：连续失败计数、降频、恢复判定 |
 | `.local/share/webcapture/paths.py` | 跨平台路径 / 浏览器 / 字体探测（Linux + Windows） |
-| `.local/share/webcapture/setup.sh` | 一次性环境准备 |
+| `.local/share/webcapture/setup.sh` | 一次性环境准备（顺带复制几份 `*.conf.example`） |
 | `.local/share/webcapture/setup.ps1` / `shot.ps1` / `install-task.ps1` | Windows 版入口与计划任务 |
 | `.config/systemd/user/webcapture.*` | 每 15 分钟的 user timer |
 
@@ -195,6 +201,143 @@ profile 目录可随时删（会重建，只是下一轮变慢）：`rm -rf ~/.c
 `compare.py` 再剥掉行首日期前缀，两边都不依赖对方。注意规则只剥「日期后面还有内容」的行，
 正文里「整行只有一个日期」的条目（如 bjjdzx 的 `1844年10月24日`）会原样保留。
 
+## 排队页监控（watch.py）
+
+整页对比适合「网站发新公告」这种粗粒度变更，但排队页上会变的只有那个号码：编号每轮都在变，
+整页报警就变成「每 15 分钟响一次」，而真正关心的「前面还有几个人」藏在 DOM 里看不出来。
+所以另有一条按 **CSS 选择器盯指定位置** 的路子，也可以反过来用：**盯整页、把噪声区域排掉**。
+
+配置 `~/webcapture/watch.conf`（模板 `watch.conf.example`，不建就完全不监控）。
+用的是 INI 格式（`configparser` 是标准库，不引入任何第三方依赖）：
+
+```ini
+[watch]
+alert_on_change = 1
+wait_ms = 3000
+
+# 一个节 = 一个监控点；节名就是报警文案里显示的名字，也是状态文件里的键
+[当前叫号]
+url = https://example.com/queue/
+selector = #current-number
+
+[前面等待]
+url = https://example.com/queue/
+selector = .waiting-count
+when = <=10
+
+# selector 不写 = 监控整页（可以顺手排掉噪声区域）
+[整页]
+url = https://example.com/news/
+
+[忽略轮播和访问量]
+url = https://example.com/queue/
+ignore = .carousel, .visitor-count
+
+# 行内不要写 # 注释：`url = https://a.com/  # 备注` 会把 # 后面也当成 URL 的一部分
+```
+
+- `url` 必填，`selector` **可省**（省了就是监控整页文本），`when` 也可省（省了就只看变化）；
+  字段名大小写不敏感。
+- `ignore` 可选：读**整页文本**之前先把这些区域藏掉（多个用逗号写，也可以直接用 `:is()`）。
+  它只影响整页文本（整页节自己的取值、以及 `compare.py` 对该页的整页对比），
+  **不影响**同一个节里 `selector` 的取值——那个仍按选择器原样取。
+- **一个节就是一个监控点**，有没有 `selector` 都一样；只是 `selector` 把范围缩到一块，
+  没有就是整页。所以「整页 + 忽略轮播」写成 `url` + `ignore` 两行就够，不用再写 `selector`。
+- **节名就是标签**，也是状态文件里的键 —— 改选择器不会丢历史，改节名则算新监控点（重建基线）。
+- 同一个 URL 写多个节就是盯多个位置；选择器命中多个元素时，取前 3 个用 ` / ` 拼起来。
+- 这个 URL **不用**再改 `capture.py` 的 `DEFAULT_URLS`：`main()` 会把它并进本轮截图列表，
+  只写 ignore 的页也一样，否则没人打开那个页面就取不到内容。
+- 旧的竖线写法（`URL | 选择器 | 标签 | 条件`）仍能读，方便老配置，但不建议新写。
+
+**为什么不选 YAML / TOML**：YAML 里 `selector: #current-number` 的 `#` 是注释符，值会变空，
+而 CSS 的 id 选择器全以 `#` 开头 —— 最关键的字段正好踩雷；TOML 的 `tomllib` 要 Python 3.11+，
+而这个项目在 Windows 上仍支持 3.9/3.10。INI 两样都不会：值里的 `#`、`|`、`%` 都是字面量。
+
+`when` 支持 `<= < >= > == != =`，取文本里**第一个数字**比较（`A-101` 的连字符不当负号）；
+`==` / `!=` 右边不是数字时按文本比较。条件只在「不满足 → 满足」时提醒**一次**，
+之后一直满足不会刷屏——这正是「排到我之前提醒我一下」的语义。
+
+`[watch]` 段的全局开关：
+
+| 键 | 默认 | 含义 |
+|---|---|---|
+| `alert_on_change` | 1 | 文本变了就报 |
+| `alert_on_first` | 0 | 第一次取值（建基线）是否也报 |
+| `wait_ms` | 3000 | 等元素出现的上限（毫秒），0 = 不等直接取 |
+| `skip_compare_alert` | 1 | 该 URL 有监控点时跳过整页变更报警（只写日志）；含图像报警，要保留就把这个设 0 |
+
+几个实现上的约定：
+
+- **抓取时机**：在页面稳定、动效冻结之后、打水印之前取，所以拿到的是归档截图里那块内容。
+- 等元素用的是 Python 侧轮询，不是 `page.wait_for_function`：截图前 `freeze_motion()` 已把页面
+  的 `setTimeout` / `rAF` 换成空实现，页面侧轮询永远等不到。
+- 选择器没匹配到内容记成 `(未匹配)`，**当作一次变化**参与对比，日志里出 `WATCH-WARN`。
+  内容后来出现时就会有一条「(未匹配) → 真实值」的报警。
+- 每轮的取值存在 `~/webcapture/state/<域名>.watch.json`，删掉即重建基线。
+- 一个 URL 既有公告又有排队号时，可用 `skip_compare_alert = 0` 让两条报警都发。
+
+**整页监控（`selector` 省略）的额外约定**：
+
+- 整页文本先过 `ignore` 隐藏，再过 `compare.norm_text()`（丢零宽、折空白、剥行首日期、
+  按 `IGNORE_REGEX` 丢时钟/轮播页码）。**必须跟已有整页报警同一套口径**：直接用原始
+  `innerText`，一个时钟就够让整页规则每轮都响。
+- 行级差异也复用 `compare.diff_change()`，所以 bjjdzx 那种横向滚动列表「只是换了顺序」不报警。
+- 报警文案只能是**行级摘要**（`文本 +N/-M 行` 加前几行新增/删除），不会把整页原文塞进消息。
+- 有整页规则时同样会用 `skip_compare_alert` **抑制 `compare.py` 的整页报警**，否则一轮两条。
+  副作用：`ALERT_ON_IMAGE_CHANGE = 1` 时图像报警会被一并抑制；需要就设 `skip_compare_alert = 0`。
+- `alert_on_change` / `alert_on_first` / `when` 对整页规则一样生效；整页取值上限
+  `WHOLE_MAX = 20000` 字符，超出部分截断（只会漏报尾部改动，不会误报）。
+
+> 只在本轮截图时采样一次（默认 15 分钟一轮，受 `webcapture.timer` 限制），**不是常驻轮询**。
+> 要「每分钟看一次」得把这个 timer 频率调高，或另做常驻 watcher。
+
+**安静模式**：排队号每轮都变时，把 `alert_on_change` 设 0，只留每个节的 `when`，
+就只在「人数 ≤10」「状态变可预约」这种关键时刻响一下。
+
+### 忽略指定区域（`ignore`）
+
+绝大多数场景要的不是「只盯一小块」，而是「**整页都盯着，但轮播/广告位/访问量别来烦我**」。
+这类噪声原来只能在 `compare.conf` 里用 `IGNORE_REGEX` 逐行匹配，文案一改就得跟着改正则；
+`ignore` 直接用 CSS 选择器圈区域，页面改版只需改一行选择器：
+
+```ini
+[忽略轮播和访问量]
+url = https://example.com/queue/
+ignore = .carousel, .visitor-count
+```
+
+这个节没有 `selector`，所以它就是**整页监控**：除了这两块，页面上其它任何文字变化都会报。
+想同时盯整页又盯某一块，就写两个节（一个省掉 `selector`，一个写）：
+
+```ini
+[整页]
+url = https://example.com/news/
+
+[叫号]
+url = https://example.com/news/
+selector = #current-number
+```
+
+实现上的几个选择：
+
+- 取文本前用一张**一次性样式表**（`[data-wc-ignore]{display:none !important}`）把命中的元素藏掉，
+  读完 `innerText` 立即删属性、移除样式表。不改元素原有内联 `style`：早先试过
+  `removeAttribute('style')`，碰过 `el.style` 后 Chromium 会留下一个空的 `style=""`。
+- `!important` 能盖过元素自带的 `display:block`，否则藏不住。
+- 在**截图之后**才隐藏，所以归档图和 `_diffs/` 里看到的还是完整页面。
+- 只影响**文本**对比：整页图差异还是按像素比（图像没法这么简单地「抠掉一块」）。
+- 选择器写错（语法非法）不会炸，只是那一条不生效；日志里有 `IGNORE ... 忽略 N 条选择器` 可对数。
+- `ignore` 的值**整串**交给 `querySelectorAll`，不按逗号拆——`:is(.a, .b)` 里的逗号
+  拆开会把选择器拆断。逗号组合、后代/子/相邻组合器（`.list > li+li`）、伪类、属性选择器都能用。
+- 续行要缩进（`configparser` 会把缩进行拼到上一行，用 `\n` 连起来，在 CSS 里等于空格）：
+
+```ini
+[忽略]
+url = https://example.com/queue/
+ignore = .carousel,
+         .visitor-count,
+         ul.list > li:nth-child(2)
+```
 
 ## 产物
 
@@ -208,8 +351,12 @@ profile 目录可随时删（会重建，只是下一轮变慢）：`rm -rf ~/.c
 ~/public/webcapture/_diffs/<域名>/<时间>.png            # 红框标出变化的差异图
 ~/webcapture/state/<域名>.{json,txt,prev.png}          # 基线：哈希 / 上轮文本 / 上轮裸图
 ~/webcapture/state/<域名>.health.json                  # 连续失败计数（fail_count=0 即正常）
+~/webcapture/state/<域名>.watch.json                   # 监控点上轮的文本与条件命中状态
 ~/webcapture/capture.log     # 每条结果即时写，排障先看这个
 ~/webcapture/run.out         # 每轮汇总
+~/webcapture/notify.conf     # webhook（含密钥，只在仓库外）
+~/webcapture/compare.conf    # 变更检测阈值
+~/webcapture/watch.conf      # 页面指定位置监控
 ```
 
 `_latest/` 用**硬链接**而不是软链：Samba 对符号链接的处理依客户端和 `unix extensions` 而定，
